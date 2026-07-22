@@ -75,26 +75,39 @@ int main(int argc, char* argv[]) {
     input_image.stride = static_cast<uint32_t>(img_w * 3);
     input_image.release_fn = free_stb_image;
 
-    // 3. Load configuration
+    // 3. Load configuration (try multiple paths for flexibility)
     ImgProcConfigHandle config_handle = IMGPROC_INVALID_CONFIG_HANDLE;
     ImgProcStatus status = imgproc_config_load(&config_handle, "rgb_filter_config.toml");
+    if (status != IMGPROC_SUCCESS) {
+        status = imgproc_config_load(&config_handle, "build/rgb_filter_config.toml");
+    }
+    if (status != IMGPROC_SUCCESS) {
+        status = imgproc_config_load(&config_handle, "tests/rgb_filter_config.toml");
+    }
     if (status != IMGPROC_SUCCESS) {
         std::fprintf(stderr, "Failed to load 'rgb_filter_config.toml': %s\n", imgproc_get_status_str(status));
         stbi_image_free(pixels);
         return EXIT_FAILURE;
     }
 
-    // 4. Load filter plugin
+    // 4. Load filter plugin (try multiple paths)
     ImgProcFilterApi filter_api{};
 #if defined(_WIN32)
     const char* plugin_lib = "librgb_channel_filter.dll";
+    const char* alt_plugin_lib = "build/librgb_channel_filter.dll";
 #elif defined(__APPLE__)
     const char* plugin_lib = "./librgb_channel_filter.dylib";
+    const char* alt_plugin_lib = "./build/librgb_channel_filter.dylib";
 #else
     const char* plugin_lib = "./librgb_channel_filter.so";
+    const char* alt_plugin_lib = "./build/librgb_channel_filter.so";
 #endif
 
     status = imgproc_filter_load_api(&filter_api, plugin_lib);
+    if (status != IMGPROC_SUCCESS) {
+        status = imgproc_filter_load_api(&filter_api, alt_plugin_lib);
+    }
+
     if (status != IMGPROC_SUCCESS) {
         std::fprintf(stderr, "Failed to load filter API from '%s': %s\n", plugin_lib, imgproc_get_status_str(status));
         imgproc_config_destroy(config_handle);
