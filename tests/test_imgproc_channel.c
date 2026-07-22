@@ -7,28 +7,7 @@
 #include <strings.h>
 #include <dirent.h>
 
-// 1. 定義顏色通道列舉
-typedef enum {
-    IMGPROC_CHANNEL_R = 0,
-    IMGPROC_CHANNEL_G = 1,
-    IMGPROC_CHANNEL_B = 2
-} ImgProcChannel;
-
-// 2. 實作新功能：直接修改影像資料陣列
-static void imgproc_image_keep_channel(ImgProcImage* image, ImgProcChannel keep_ch) {
-    if (!image || !image->data) return;
-    
-    uint8_t* pixels = (uint8_t*)image->data;
-    for (uint32_t y = 0; y < image->height; ++y) {
-        for (uint32_t x = 0; x < image->width; ++x) {
-            size_t idx = (size_t)y * image->stride + (size_t)x * 3;
-            // 根據選擇的通道，將另外兩個通道數值歸零
-            if (keep_ch != IMGPROC_CHANNEL_R) pixels[idx + 0] = 0; 
-            if (keep_ch != IMGPROC_CHANNEL_G) pixels[idx + 1] = 0; 
-            if (keep_ch != IMGPROC_CHANNEL_B) pixels[idx + 2] = 0; 
-        }
-    }
-}
+#include <imgproc_channel.h>
 
 // 輔助函式：取得目錄
 static const char* get_target_dir(const char* dir_name, char* out_buf, size_t buf_size) {

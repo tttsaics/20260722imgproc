@@ -29,7 +29,8 @@ add_library(imgproc SHARED
     src/imgproc_logger.cpp
     src/imgproc_utils.cpp
     src/imgproc_filter_loader.cpp
-    src/imgproc_image_io.cpp)
+    src/imgproc_image_io.cpp
+    src/imgproc_channel.cpp)
 target_include_directories(imgproc
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
