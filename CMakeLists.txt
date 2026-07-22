@@ -84,3 +84,8 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/inputs
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/outputs)
 add_test(NAME ImageIOTest COMMAND test_imgproc_image_io)
+
+# Image Channel Filter Unit Test
+add_executable(test_imgproc_channel tests/test_imgproc_channel.c)
+target_link_libraries(test_imgproc_channel PRIVATE imgproc)
+add_test(NAME ImageChannelTest COMMAND test_imgproc_channel)
