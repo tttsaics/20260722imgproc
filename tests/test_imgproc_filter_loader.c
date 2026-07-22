@@ -53,6 +53,7 @@ static bool test_transform(const ImgProcFilterApi* api, ImgProcFilterHandle filt
         return false;
     }
 
+    output_image->release_fn(output_image);
     return true;
 }
 

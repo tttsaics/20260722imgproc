@@ -51,6 +51,16 @@ target_link_libraries(dummy_filter
         imgproc)
 
 
+add_library(rgb_channel_filter SHARED
+    src/rgb_channel_filter.cpp)
+target_include_directories(rgb_channel_filter
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(rgb_channel_filter
+    PRIVATE
+        imgproc)
+
+
 enable_testing()
 
 add_executable(test_imgproc_config
@@ -74,3 +84,14 @@ add_custom_command(
     ${CMAKE_SOURCE_DIR}/tests/dummy_filter_config.toml
     ${CMAKE_CURRENT_BINARY_DIR}/dummy_filter_config.toml)
 add_test(NAME FilterLoaderTest COMMAND test_imgproc_filter_loader)
+
+add_executable(test_rgb_channel_filter
+    tests/test_rgb_channel_filter.cpp
+)
+target_link_libraries(test_rgb_channel_filter PRIVATE imgproc ${CMAKE_DL_LIBS})
+add_custom_command(
+    TARGET test_rgb_channel_filter POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_SOURCE_DIR}/tests/rgb_filter_config.toml
+    ${CMAKE_CURRENT_BINARY_DIR}/rgb_filter_config.toml)
+add_test(NAME RgbChannelFilterTest COMMAND test_rgb_channel_filter)
