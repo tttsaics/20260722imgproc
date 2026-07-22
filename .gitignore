@@ -1,0 +1,10 @@
+build/
+outputs/
+html/
+latex/
+.vscode/
+*:Zone.Identifier
+*.Zone.Identifier
+*.so
+*.a
+*.o
