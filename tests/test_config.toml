@@ -1,0 +1,6 @@
+[test_get_value]
+int_value=123
+dbl_value=12.3
+bool_value_false=false
+bool_value_true=true
+str_value="hello world"
