@@ -11,6 +11,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 #include <vector>
 
 static void free_stb_image(ImgProcImage* image) {
@@ -20,37 +21,49 @@ static void free_stb_image(ImgProcImage* image) {
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     imgproc_logger_use_console();
     imgproc_logger_set_level(IMGPROC_LOGLEVEL_INFO);
 
-    const char* input_filename = "test_input.png";
-    const char* output_filename = "test_output_R.png";
-    const int width = 64;
-    const int height = 64;
+    std::string input_filename = "test_input.png";
+    std::string output_filename = "test_output_R.png";
+    bool custom_input = false;
 
-    // 1. Generate a synthetic input image (64x64 RGB)
-    std::vector<uint8_t> synthetic_data(width * height * 3);
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            int idx = (y * width + x) * 3;
-            synthetic_data[idx + 0] = 200; // Red channel
-            synthetic_data[idx + 1] = 150; // Green channel
-            synthetic_data[idx + 2] = 100; // Blue channel
+    if (argc > 1) {
+        input_filename = argv[1];
+        custom_input = true;
+        if (argc > 2) {
+            output_filename = argv[2];
+        } else {
+            output_filename = "output_filtered.png";
         }
-    }
+        std::printf("Using custom input image: '%s'\n", input_filename.c_str());
+    } else {
+        const int width = 64;
+        const int height = 64;
+        // Generate a synthetic input image (64x64 RGB)
+        std::vector<uint8_t> synthetic_data(width * height * 3);
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                int idx = (y * width + x) * 3;
+                synthetic_data[idx + 0] = 200; // Red channel
+                synthetic_data[idx + 1] = 150; // Green channel
+                synthetic_data[idx + 2] = 100; // Blue channel
+            }
+        }
 
-    if (!stbi_write_png(input_filename, width, height, 3, synthetic_data.data(), width * 3)) {
-        std::fprintf(stderr, "Failed to write synthetic test image.\n");
-        return EXIT_FAILURE;
+        if (!stbi_write_png(input_filename.c_str(), width, height, 3, synthetic_data.data(), width * 3)) {
+            std::fprintf(stderr, "Failed to write synthetic test image.\n");
+            return EXIT_FAILURE;
+        }
+        std::printf("Successfully created synthetic input image '%s'.\n", input_filename.c_str());
     }
-    std::printf("Successfully created synthetic input image '%s'.\n", input_filename);
 
     // 2. Load the input image using stb_image
     int img_w = 0, img_h = 0, img_comp = 0;
-    stbi_uc* pixels = stbi_load(input_filename, &img_w, &img_h, &img_comp, 3);
+    stbi_uc* pixels = stbi_load(input_filename.c_str(), &img_w, &img_h, &img_comp, 3);
     if (!pixels) {
-        std::fprintf(stderr, "Failed to load image '%s'.\n", input_filename);
+        std::fprintf(stderr, "Failed to load image '%s'.\n", input_filename.c_str());
         return EXIT_FAILURE;
     }
 
@@ -112,30 +125,32 @@ int main() {
         return EXIT_FAILURE;
     }
 
-    // 7. Verify pixel channels (R should be 200, G should be 0, B should be 0)
-    uint8_t* out_data = static_cast<uint8_t*>(output_image_ptr->data);
+    // 7. Verify pixel channels (only for synthetic test)
     bool check_passed = true;
-    for (uint32_t i = 0; i < output_image_ptr->width * output_image_ptr->height; ++i) {
-        uint8_t r = out_data[i * 3 + 0];
-        uint8_t g = out_data[i * 3 + 1];
-        uint8_t b = out_data[i * 3 + 2];
-        if (r != 200 || g != 0 || b != 0) {
-            check_passed = false;
-            std::fprintf(stderr, "Pixel check failed at index %u: R=%d, G=%d, B=%d\n", i, r, g, b);
-            break;
+    if (!custom_input) {
+        uint8_t* out_data = static_cast<uint8_t*>(output_image_ptr->data);
+        for (uint32_t i = 0; i < output_image_ptr->width * output_image_ptr->height; ++i) {
+            uint8_t r = out_data[i * 3 + 0];
+            uint8_t g = out_data[i * 3 + 1];
+            uint8_t b = out_data[i * 3 + 2];
+            if (r != 200 || g != 0 || b != 0) {
+                check_passed = false;
+                std::fprintf(stderr, "Pixel check failed at index %u: R=%d, G=%d, B=%d\n", i, r, g, b);
+                break;
+            }
+        }
+
+        if (check_passed) {
+            std::printf("Pixel verification passed: Green and Blue channels successfully zeroed out!\n");
         }
     }
 
-    if (check_passed) {
-        std::printf("Pixel verification passed: Green and Blue channels successfully zeroed out!\n");
-    }
-
     // 8. Save output image
-    if (stbi_write_png(output_filename, output_image_ptr->width, output_image_ptr->height, 3,
+    if (stbi_write_png(output_filename.c_str(), output_image_ptr->width, output_image_ptr->height, 3,
                        output_image_ptr->data, output_image_ptr->stride)) {
-        std::printf("Successfully saved transformed image to '%s'.\n", output_filename);
+        std::printf("Successfully saved transformed image to '%s'.\n", output_filename.c_str());
     } else {
-        std::fprintf(stderr, "Failed to save output image '%s'.\n", output_filename);
+        std::fprintf(stderr, "Failed to save output image '%s'.\n", output_filename.c_str());
     }
 
     // 9. Resource cleanup
