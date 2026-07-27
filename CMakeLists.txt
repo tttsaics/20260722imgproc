@@ -28,7 +28,9 @@ add_library(imgproc SHARED
     src/imgproc_config.cpp
     src/imgproc_logger.cpp
     src/imgproc_utils.cpp
-    src/imgproc_filter_loader.cpp)
+    src/imgproc_filter_loader.cpp
+    src/imgproc_image_io.cpp
+    src/imgproc_channel.cpp)
 target_include_directories(imgproc
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -50,6 +52,18 @@ target_link_libraries(dummy_filter
     PRIVATE
         imgproc)
 
+add_library(resize_filter SHARED
+    src/resize_filter.cpp)
+target_include_directories(resize_filter
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(resize_filter
+    PRIVATE
+        imgproc)
+
+add_executable(imgproc_app main.cpp)
+target_link_libraries(imgproc_app PRIVATE imgproc)
+add_dependencies(imgproc_app resize_filter dummy_filter)
 
 add_library(rgb_channel_filter SHARED
     src/rgb_channel_filter.cpp)
@@ -95,3 +109,17 @@ add_custom_command(
     ${CMAKE_SOURCE_DIR}/tests/rgb_filter_config.toml
     ${CMAKE_CURRENT_BINARY_DIR}/rgb_filter_config.toml)
 add_test(NAME RgbChannelFilterTest COMMAND test_rgb_channel_filter)
+
+# Image IO Unit Test
+add_executable(test_imgproc_image_io tests/test_imgproc_image_io.c)
+target_link_libraries(test_imgproc_image_io PRIVATE imgproc)
+add_custom_command(
+    TARGET test_imgproc_image_io POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/inputs
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/outputs)
+add_test(NAME ImageIOTest COMMAND test_imgproc_image_io)
+
+# Image Channel Filter Unit Test
+add_executable(test_imgproc_channel tests/test_imgproc_channel.c)
+target_link_libraries(test_imgproc_channel PRIVATE imgproc)
+add_test(NAME ImageChannelTest COMMAND test_imgproc_channel)

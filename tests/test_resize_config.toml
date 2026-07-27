@@ -1,0 +1,3 @@
+[resize_filter]
+scale = 0.5
+method = "bilinear"
