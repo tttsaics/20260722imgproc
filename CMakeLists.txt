@@ -29,7 +29,8 @@ add_library(imgproc SHARED
     src/imgproc_logger.cpp
     src/imgproc_utils.cpp
     src/imgproc_filter_loader.cpp
-    src/imgproc_image_io.cpp)
+    src/imgproc_image_io.cpp
+    src/imgproc_channel.cpp)
 target_include_directories(imgproc
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -84,3 +85,8 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/inputs
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_SOURCE_DIR}/outputs)
 add_test(NAME ImageIOTest COMMAND test_imgproc_image_io)
+
+# Image Channel Filter Unit Test
+add_executable(test_imgproc_channel tests/test_imgproc_channel.c)
+target_link_libraries(test_imgproc_channel PRIVATE imgproc)
+add_test(NAME ImageChannelTest COMMAND test_imgproc_channel)
