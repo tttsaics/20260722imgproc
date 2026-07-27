@@ -9,23 +9,15 @@
 
 #include <imgproc_channel.h>
 
-// 輔助函式：取得目錄
+// 輔助函式：取得目錄（透過檢查 inputs 的位置，判斷當前是在根目錄還是在 build/ 目錄中執行）
 static const char* get_target_dir(const char* dir_name, char* out_buf, size_t buf_size) {
-    DIR* dir = opendir(dir_name);
+    DIR* dir = opendir("inputs");
     if (dir) {
         closedir(dir);
         snprintf(out_buf, buf_size, "%s", dir_name);
-        return out_buf;
-    }
-    char parent_path[256];
-    snprintf(parent_path, sizeof(parent_path), "../%s", dir_name);
-    dir = opendir(parent_path);
-    if (dir) {
-        closedir(dir);
+    } else {
         snprintf(out_buf, buf_size, "../%s", dir_name);
-        return out_buf;
     }
-    snprintf(out_buf, buf_size, "%s", dir_name);
     return out_buf;
 }
 

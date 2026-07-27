@@ -9,21 +9,13 @@
 #define TEST_PRINT_CALL_ERROR(expr, status) fprintf(stderr, "%s error: %s\n", #expr, imgproc_get_status_str((status)))
 
 static const char* get_target_dir(const char* dir_name, char* out_buf, size_t buf_size) {
-    DIR* dir = opendir(dir_name);
+    DIR* dir = opendir("inputs");
     if (dir) {
         closedir(dir);
         snprintf(out_buf, buf_size, "%s", dir_name);
-        return out_buf;
-    }
-    char parent_path[256];
-    snprintf(parent_path, sizeof(parent_path), "../%s", dir_name);
-    dir = opendir(parent_path);
-    if (dir) {
-        closedir(dir);
+    } else {
         snprintf(out_buf, buf_size, "../%s", dir_name);
-        return out_buf;
     }
-    snprintf(out_buf, buf_size, "%s", dir_name);
     return out_buf;
 }
 
