@@ -83,6 +83,15 @@ target_link_libraries(rotate_filter
     PRIVATE
         imgproc)
 
+add_library(mirror_filter SHARED
+    src/mirror_filter.cpp)
+target_include_directories(mirror_filter
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(mirror_filter
+    PRIVATE
+        imgproc)
+
 
 enable_testing()
 
@@ -127,3 +136,9 @@ add_executable(test_grayscale_filter tests/test_grayscale_filter.c)
 target_link_libraries(test_grayscale_filter PRIVATE imgproc ${CMAKE_DL_LIBS})
 add_dependencies(test_grayscale_filter grayscale_filter)
 add_test(NAME GrayscaleFilterTest COMMAND test_grayscale_filter)
+
+# Mirror Filter Unit Test
+add_executable(test_mirror_filter tests/test_mirror_filter.c)
+target_link_libraries(test_mirror_filter PRIVATE imgproc ${CMAKE_DL_LIBS})
+add_dependencies(test_mirror_filter mirror_filter)
+add_test(NAME MirrorFilterTest COMMAND test_mirror_filter)
