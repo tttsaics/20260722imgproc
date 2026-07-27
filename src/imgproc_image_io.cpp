@@ -45,7 +45,7 @@ ImgProcStatus imgproc_image_read(const char* filename, ImgProcImage** image) {
     int height = 0;
     int channels = 0;
 
-    unsigned char* pixels = stbi_load(filename, &width, &height, &channels, 3);
+    unsigned char* pixels = stbi_load(filename, &width, &height, &channels, 0);
     if (!pixels) {
         IMGPROC_LOG_ERROR("Failed to load image '%s': %s", filename, stbi_failure_reason());
         return IMGPROC_ERROR_RUNTIME;
@@ -59,14 +59,14 @@ ImgProcStatus imgproc_image_read(const char* filename, ImgProcImage** image) {
     }
 
     img->data = pixels;
-    img->data_size = static_cast<size_t>(width) * height * 3;
+    img->data_size = static_cast<size_t>(width) * height * channels;
     img->width = static_cast<uint32_t>(width);
     img->height = static_cast<uint32_t>(height);
-    img->stride = static_cast<uint32_t>(width * 3);
+    img->stride = static_cast<uint32_t>(width * channels);
     img->release_fn = stbi_image_release_wrapper;
 
     *image = img;
-    IMGPROC_LOG_INFO("Loaded image '%s' (%dx%d, RGB).", filename, width, height);
+    IMGPROC_LOG_INFO("Loaded image '%s' (%dx%d, %d channels).", filename, width, height, channels);
 
     return IMGPROC_SUCCESS;
 }
@@ -89,8 +89,9 @@ ImgProcStatus imgproc_image_write_jpg(const char* filename, ImgProcImage* image,
 
     ensure_parent_dir_exists(filename);
 
+    int comp = (image->width > 0) ? static_cast<int>(image->stride / image->width) : 3;
     int result = stbi_write_jpg(filename, static_cast<int>(image->width),
-                                static_cast<int>(image->height), 3, image->data, quality);
+                                static_cast<int>(image->height), comp, image->data, quality);
     if (!result) {
         IMGPROC_LOG_ERROR("Failed to write JPEG image to '%s'.", filename);
         return IMGPROC_ERROR_RUNTIME;
@@ -113,9 +114,10 @@ ImgProcStatus imgproc_image_write_png(const char* filename, ImgProcImage* image)
 
     ensure_parent_dir_exists(filename);
 
+    int comp = (image->width > 0) ? static_cast<int>(image->stride / image->width) : 3;
     int stride_in_bytes = static_cast<int>(image->stride);
     int result = stbi_write_png(filename, static_cast<int>(image->width),
-                                static_cast<int>(image->height), 3, image->data, stride_in_bytes);
+                                static_cast<int>(image->height), comp, image->data, stride_in_bytes);
     if (!result) {
         IMGPROC_LOG_ERROR("Failed to write PNG image to '%s'.", filename);
         return IMGPROC_ERROR_RUNTIME;
