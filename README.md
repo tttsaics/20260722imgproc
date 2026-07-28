@@ -24,7 +24,7 @@
 
 ```mermaid
 flowchart TD
-    subgraph CLI App [命令列主程式 (imgproc_app)]ㄆ
+    subgraph CLI App [命令列主程式 (imgproc_app)]
         Main[CLI 解析與排程]
         Batch[自動批次處理]
     end
