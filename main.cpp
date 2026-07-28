@@ -1,9 +1,3 @@
-/**
- * @file main.cpp
- * @brief High-level CLI orchestrator application for ImgProc SDK.
- *        Supports multi-filter plugin chaining (-f p1.so -c c1.toml -f p2.so -c c2.toml).
- */
-
 #include <imgproc_channel.h>
 #include <imgproc_config.h>
 #include <imgproc_filter_loader.h>
@@ -19,6 +13,7 @@
 #include <vector>
 
 static void print_usage(const char* prog_name) {
+    // 輸出命令列選項與使用說明。
     std::cout << "Usage: " << prog_name << " [options]\n"
               << "Options:\n"
               << "  -i, --input <file>     Path to input image (JPG/PNG)\n"
@@ -31,6 +26,7 @@ static void print_usage(const char* prog_name) {
 }
 
 static bool is_image_extension(const std::string& filename) {
+    // 透過 std::filesystem 解析副檔名並轉小寫比對。
     std::filesystem::path p(filename);
     std::string ext = p.extension().string();
     for (char& c : ext) c = static_cast<char>(std::tolower(c));
@@ -44,7 +40,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
                                          const std::string& channel_str) {
     ImgProcStatus status = IMGPROC_SUCCESS;
 
-    // Validate channel_str if provided
+    // 1. 入口參數邊界檢驗：若指定 -ch，檢查是否為合法通道 (R, G, B)。
     if (!channel_str.empty()) {
         std::string ch_upper = channel_str;
         for (char& c : ch_upper) c = static_cast<char>(std::toupper(c));
@@ -54,7 +50,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
         }
     }
 
-    // Validate output extension
+    // 2. 檢驗輸出副檔名是否為支援的格式 (.jpg, .jpeg, .png)。
     std::filesystem::path out_p(output_path);
     std::string out_ext = out_p.extension().string();
     for (char& c : out_ext) c = static_cast<char>(std::tolower(c));
@@ -63,7 +59,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    // 1. Read input image using IO module
+    // 3. 透過 Image IO 模組讀取輸入圖片。
     ImgProcImage* current_img = nullptr;
     status = imgproc_image_read(input_path.c_str(), &current_img);
     if (status != IMGPROC_SUCCESS) {
@@ -71,14 +67,16 @@ static ImgProcStatus process_single_image(const std::string& input_path,
         return status;
     }
 
+    // 追蹤所有已載入的外掛 API 與控制句柄，確保 `.so` 在圖片完全解構前維持有效。
     std::vector<ImgProcFilterApi> loaded_apis;
     std::vector<ImgProcFilterHandle> active_handles;
 
-    // 2. Chain-execute filter plugins in sequence
+    // 4. 按順序鏈式執行多外掛流水線 (Filter Pipeline)。
     for (size_t i = 0; i < filter_paths.size(); ++i) {
         const std::string& f_path = filter_paths[i];
         std::string c_path = (i < config_paths.size()) ? config_paths[i] : "";
 
+        // 若提供配對的 TOML 設定檔，載入設定檔控制句柄。
         ImgProcConfigHandle config_handle = IMGPROC_INVALID_CONFIG_HANDLE;
         if (!c_path.empty()) {
             status = imgproc_config_load(&config_handle, c_path.c_str());
@@ -88,6 +86,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
             }
         }
 
+        // 動態載入 .so 外掛的 API 函數指標。
         ImgProcFilterApi filter_api;
         std::memset(&filter_api, 0, sizeof(filter_api));
         status = imgproc_filter_load_api(&filter_api, f_path.c_str());
@@ -97,6 +96,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
             break;
         }
 
+        // 建立外掛控制句柄，創建完成後立即釋放單次使用的 Config 句柄。
         ImgProcFilterHandle filter_handle = IMGPROC_INVALID_FILTER_HANDLE;
         status = filter_api.create(&filter_handle, config_handle);
         if (config_handle != IMGPROC_INVALID_CONFIG_HANDLE) {
@@ -109,10 +109,11 @@ static ImgProcStatus process_single_image(const std::string& input_path,
             break;
         }
 
-        // Keep API and handle tracked so code segment remains valid until cleanup
+        // 將成功的 API 與 Handle 存入陣列，維護動態庫代碼段 (Code Segment) 生命週期。
         loaded_apis.push_back(filter_api);
         active_handles.push_back(filter_handle);
 
+        // 執行影像變換，將 current_img 作為輸入，取得產出的 next_img。
         ImgProcImage* next_img = nullptr;
         status = filter_api.transform(filter_handle, current_img, &next_img);
 
@@ -124,13 +125,13 @@ static ImgProcStatus process_single_image(const std::string& input_path,
         ImgProcImage* prev_img = current_img;
         current_img = next_img;
 
-        // Clean up previous image struct shell (data buffer was freed inside transform's release_fn)
+        // 舊圖片資料記憶體已由 transform 內部呼叫 release_fn 釋放，此處僅刪除外層 struct 外殼。
         if (prev_img && prev_img != current_img) {
             delete prev_img;
         }
     }
 
-    // 3. Handle RGB Channel if specified
+    // 5. 若指定 -ch 參數，執行指定色彩通道提取。
     if (status == IMGPROC_SUCCESS && !channel_str.empty()) {
         ImgProcChannel ch = IMGPROC_CHANNEL_R;
         if (channel_str == "G" || channel_str == "g") ch = IMGPROC_CHANNEL_G;
@@ -139,7 +140,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
         imgproc_image_keep_channel(current_img, ch);
     }
 
-    // 4. Save output image using IO module
+    // 6. 依據副檔名透過 Image IO 模組將最終影像寫回硬碟。
     if (status == IMGPROC_SUCCESS) {
         if (out_ext == ".jpg" || out_ext == ".jpeg") {
             status = imgproc_image_write_jpg(output_path.c_str(), current_img, 90);
@@ -148,12 +149,12 @@ static ImgProcStatus process_single_image(const std::string& input_path,
         }
     }
 
-    // 5. Clean up final transformed image BEFORE unloading plugin shared libraries
+    // 7. 【重點順序】：先銷毀最終影像物件（觸發 release_fn 閉包），必須在卸載 .so 動態庫之前完成！
     if (current_img) {
         imgproc_image_destroy(current_img);
     }
 
-    // 6. Safely destroy all loaded filter handles and unload dynamic .so APIs (Leak-proof cleanup)
+    // 8. 最後才銷毀外掛 Handle 並以 dlclose 卸載 .so 動態庫，確保無記憶體與 Handle 洩漏。
     for (size_t i = 0; i < loaded_apis.size(); ++i) {
         if (i < active_handles.size() && active_handles[i]) {
             loaded_apis[i].destroy(active_handles[i]);
@@ -165,6 +166,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
 }
 
 int main(int argc, char* argv[]) {
+    // 啟用控制台日誌輸出，設定預設 Log 層級。
     imgproc_logger_use_console();
     imgproc_logger_set_level(IMGPROC_LOGLEVEL_INFO);
 
@@ -174,6 +176,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> config_paths;
     std::string channel_str;
 
+    // 解析 CLI 命令列參數。
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg == "-h" || arg == "--help") {
@@ -192,6 +195,7 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // 單張圖片處理模式。
     if (!input_path.empty()) {
         if (output_path.empty()) {
             output_path = "outputs/app_output.png";
@@ -200,7 +204,7 @@ int main(int argc, char* argv[]) {
         return (status == IMGPROC_SUCCESS) ? EXIT_SUCCESS : EXIT_FAILURE;
     }
 
-    // Auto Batch Mode: If no arguments, scan inputs/ and process to outputs/
+    // 自動批次處理模式 (Auto Batch Mode)：若無 CLI 參數，自動掃描 inputs/ 資料夾。
     std::string in_dir = "inputs";
     std::string out_dir = "outputs";
     if (!std::filesystem::exists(in_dir) && std::filesystem::exists("../inputs")) {
@@ -235,5 +239,6 @@ int main(int argc, char* argv[]) {
         IMGPROC_LOG_INFO("No image files found in '%s/'.", in_dir.c_str());
     }
 
+    // 批次模式傳回狀態：若有圖片處理失敗，回傳 EXIT_FAILURE。
     return (processed_any && all_success) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
