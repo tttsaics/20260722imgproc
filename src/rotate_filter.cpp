@@ -37,7 +37,7 @@ ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    int32_t angle = 360; // default angle
+    int32_t angle = 360; 
 
     if (filter_config_handle) {
         IMGPROC_LOG_INFO("Reading rotate_filter configuration.");
@@ -45,7 +45,7 @@ ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
         ImgProcStatus status =
             imgproc_config_get_int64(filter_config_handle, "rotate_filter", "angle", &config_angle);
         if (status == IMGPROC_SUCCESS) {
-            if (config_angle >= INT32_MIN && config_angle <= INT32_MAX) {
+            if (config_angle >= INT32_MIN && config_angle <= INT32_MAX) {   //保證數值轉換安全
                 angle = static_cast<int32_t>(config_angle);
             } else {
                 IMGPROC_LOG_WARN("Config angle %ld out of int32 bounds, using default (%d).", config_angle, angle);
@@ -57,9 +57,9 @@ ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
         IMGPROC_LOG_INFO("Configuration file is not specified, using default angle (%d).", angle);
     }
 
-    // Standardize 360 to 0 degrees logically
-    int normalized_angle = angle % 360;
-    if (normalized_angle < 0) normalized_angle += 360;
+    //角度正規劃
+    int normalized_angle = angle % 360; //同餘轉換
+    if (normalized_angle < 0) normalized_angle += 360;//負數補正
 
     if (normalized_angle != 0 && normalized_angle != 90 && normalized_angle != 180 && normalized_angle != 270) {
         IMGPROC_LOG_ERROR("Invalid rotation angle: %d. Only 90, 180, 270, and 360 degrees are supported.", angle);
@@ -112,17 +112,18 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
 
     uint32_t channels = 4;
 
-    // Determine target width and height
+   
     uint32_t new_width = input->width;
     uint32_t new_height = input->height;
 
-    if (angle == 90 || angle == 270) {
+    if (angle == 90 || angle == 270) {//若角度是 90 or 270長寬要對調
         new_width = input->height;
         new_height = input->width;
     }
 
-    uint32_t new_stride = (new_width * channels + 3) & ~3; // 4-byte aligned
-    uint64_t total_bytes = static_cast<uint64_t>(new_stride) * new_height;
+    uint32_t new_stride = (new_width * channels + 3) & ~3; 
+    uint64_t total_bytes = static_cast<uint64_t>(new_stride) * new_height;  //避免發生溢位
+    
     if (new_width > 100000 || new_height > 100000 || total_bytes > 2000000000ULL) {
         IMGPROC_LOG_ERROR("Rotate target dimensions (%ux%u) or buffer size (%lu bytes) overflow limits.",
                           new_width, new_height, total_bytes);
@@ -157,7 +158,7 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         }
     };
 
-    const uint8_t* src = static_cast<const uint8_t*>(input->data);
+    const uint8_t* src = static_cast<const uint8_t*>(input->data); 
     uint8_t* dst = static_cast<uint8_t*>(out_img->data);
 
     for (uint32_t y = 0; y < new_height; ++y) {
@@ -175,7 +176,7 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
                 src_x = input->width - 1 - y;
                 src_y = x;
             }
-            // angle == 0 (or 360): src_x = x, src_y = y
+
 
             const uint8_t* src_pixel = src + src_y * input->stride + src_x * channels;
             uint8_t* dst_pixel = dst + y * new_stride + x * channels;
@@ -186,7 +187,7 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         }
     }
 
-    // Release input image memory if release callback exists
+    
     if (input->release_fn) {
         input->release_fn(input);
     }
