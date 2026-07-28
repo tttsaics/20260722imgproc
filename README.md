@@ -1,50 +1,48 @@
-# ImgProc - C/C++ 圖像處理框架與動態插件系統說明書
+# ImgProc 圖像處理框架 (C/C++ Dynamic Plugin Framework)
 
-`ImgProc` 是一個高效率、模組化且可擴充的 C/C++ 圖像處理 SDK 框架與 CLI 命令列工具。專案採用 C-ABI 外掛插件架構，支援透過動態鏈結庫（`.so` / `.dll`）進行運行時（Runtime）濾鏡載入、多濾鏡串接處理（Filter Chaining）、TOML 格式設定檔讀取以及圖像 RGB 通道提取。
+![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)
+![C99](https://img.shields.io/badge/C-99-blue.svg)
+![CMake](https://img.shields.io/badge/CMake-3.20%2B-green.svg)
+![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
----
-
-## 1. 專案特點與架構總覽 (Overview & Features)
-
-* **動態插件架構 (Dynamic Plugin Architecture)**：
-  濾鏡以動態共享庫獨立開發與編譯，利用 `dlopen` / `dlsym` (Linux) 於運行時動態載入，具備高度解耦與擴充性。
-* **多濾鏡鏈接處理 (Multi-Filter Chaining)**：
-  CLI 主程式支援依序鏈接多個濾鏡插件（如 `-f scale.so -c scale.toml -f rotate.so -c rotate.toml`），流暢執行影像處理 pipeline。
-* **強大的 TOML 設定解析**：
-  整合 `tomlplusplus` 解析器，提供 C-ABI 包裝函式，讓插件能靈活讀取整數位、浮點數、布林值與字串等設定。
-* **完整圖像 I/O 支援**：
-  整合 `stb_image` 與 `stb_image_write`，支援主流 JPEG, PNG, BMP 檔案解碼與編碼。
-* **記憶體安全與自訂釋放機制**：
-  `ImgProcImage` 結構包含 `release_fn` 資源釋放回呼函式，確保插件轉譯產生的記憶體能被安全正確釋放，避免 Memory Leak。
-* **自動批次處理模式 (Auto Batch Mode)**：
-  未傳入參數時自動掃描 `inputs/` 目錄，將批次處理後的結果輸出至 `outputs/` 目錄。
+**ImgProc** 是一個以 C/C++ 開發的高效能圖像處理 SDK 與命令列工具 (CLI)。本專案採用動態鏈結庫 (.so) 實作外掛插件架構，允許開發者在執行期間動態載入各種影像濾鏡。除了支援單一濾鏡處理，也支援多濾鏡串接 (Filter Chaining)、TOML 設定檔參數讀取、自動批次處理以及單一色彩通道提取功能。
 
 ---
 
-## 2. 系統架構圖 (System Architecture)
+## ✨ 核心特色 (Features)
+
+- 🔌 **動態外掛系統 (Dynamic Plugin Architecture)**: 濾鏡模組透過 C-ABI 導出介面，在執行期使用 `dlopen/dlsym` 載入，主程式與濾鏡高度解耦。
+- 🔗 **濾鏡串接 (Filter Chaining)**: 支援在命令列依序指定多個濾鏡與對應的設定檔，無縫建立影像處理管線。
+- ⚙️ **TOML 設定解析**: 內建 `tomlplusplus` 整合，讓動態濾鏡可輕鬆讀取外部的數值與字串設定。
+- 🖼️ **主流格式支援**: 基於 `stb_image` 實作，完整支援 JPEG、PNG 與 BMP 檔案解碼與編碼。
+- 🛡️ **安全的記憶體管理**: 使用自訂的資源釋放回呼函式 (`release_fn`)，確保各動態濾鏡在轉譯過程中的記憶體分配能夠被正確回收，防止記憶體洩漏。
+- 🚀 **自動批次處理 (Auto Batch Mode)**: 在不指定參數的情況下，CLI 將自動掃描 `inputs/` 目錄並將處理後的結果輸出至 `outputs/`。
+
+---
+
+## 🏗️ 系統架構 (Architecture)
 
 ```mermaid
 flowchart TD
-    subgraph CLI Orchestrator [CLI 主程式 (imgproc_app)]
-        Main[main.cpp CLI]
-        Batch[自動批次模組]
+    subgraph CLI App [命令列主程式 (imgproc_app)]
+        Main[CLI 解析與排程]
+        Batch[自動批次處理]
     end
 
-    subgraph Core SDK [ImgProc 核心庫 (libimgproc.so)]
-        Config[TOML 設定模組\nimgproc_config]
-        Loader[動態載入器\nimgproc_filter_loader]
-        IO[圖像 I/O 模組\nimgproc_image_io]
-        Channel[通道處理模組\nimgproc_channel]
-        Logger[日誌模組\nimgproc_logger]
-        Utils[通用基礎結構\nimgproc_utils]
+    subgraph Core SDK [ImgProc 核心函式庫 (libimgproc.so)]
+        Config[TOML 設定模組\n(imgproc_config)]
+        Loader[動態載入器\n(imgproc_filter_loader)]
+        IO[影像 I/O 模組\n(imgproc_image_io)]
+        Channel[通道提取模組\n(imgproc_channel)]
+        Logger[日誌模組\n(imgproc_logger)]
     end
 
-    subgraph Dynamic Filters [獨立動態濾鏡插件 (.so)]
-        Dummy[dummy_filter.so]
+    subgraph Dynamic Filters [動態濾鏡外掛 (.so)]
         Grayscale[grayscale_filter.so]
         Mirror[mirror_filter.so]
         Resize[resize_filter.so]
         Rotate[rotate_filter.so]
+        Dummy[dummy_filter.so]
     end
 
     Main --> IO
@@ -52,274 +50,153 @@ flowchart TD
     Main --> Config
     Main --> Channel
     Loader -->|dlopen / dlsym| Dynamic Filters
-    Config -->|tomlplusplus| TOML[TOML 設定檔]
-    IO -->|stb_image| FileInput[輸入圖片 JPEG/PNG]
-    IO -->|stb_image_write| FileOutput[輸出圖片 JPEG/PNG]
+    Config -->|tomlplusplus| TOML[外部 TOML 設定檔]
+    IO -->|stb_image| Input[輸入 JPEG/PNG]
+    IO -->|stb_image_write| Output[輸出 JPEG/PNG]
 ```
 
 ---
 
-## 3. 專案目錄結構 (Directory Structure)
+## 📂 專案目錄結構 (Directory Structure)
 
 ```text
-20260722imgproc-main-5/
-├── CMakeLists.txt                # CMake 主構建檔案
-├── README.md                     # 專案說明文件
-├── main.cpp                      # CLI 高階調度器應用程式
-├── include/                      # 公開 C API 標頭檔
-│   ├── imgproc_channel.h         # 通道處理模組 API
-│   ├── imgproc_config.h          # TOML 設定檔解析 API
-│   ├── imgproc_filter_common.h   # 濾鏡插件 C-ABI 介面定義
-│   ├── imgproc_filter_loader.h   # 濾鏡動態庫載入器 API
-│   ├── imgproc_image_io.h        # 圖像讀寫與資源釋放 API
-│   ├── imgproc_logger.h         # 日誌輸出系統 API
-│   ├── imgproc_utils.h          # 狀態碼與 ImgProcImage 結構
-│   ├── stb_image.h               # stb 圖像解碼第三方標頭檔
-│   └── stb_image_write.h         # stb 圖像編碼第三方標頭檔
-├── src/                          # 核心庫與濾鏡插件實現
-│   ├── dummy_filter.cpp          # 測試用 Dummy 濾鏡實現
-│   ├── grayscale_filter.cpp      # 灰階化濾鏡實現
-│   ├── mirror_filter.cpp         # 鏡像翻轉濾鏡實現
-│   ├── resize_filter.cpp         # 圖像縮放濾鏡實現
-│   ├── rotate_filter.cpp         # 圖像旋轉濾鏡實現
-│   ├── imgproc_channel.cpp       # 核心通道提取邏輯
-│   ├── imgproc_config.cpp        # 核心 TOML 設定讀取邏輯
-│   ├── imgproc_filter_loader.cpp # 核心動態庫 dlopen 調度邏輯
-│   ├── imgproc_image_io.cpp      # 核心圖像解碼與編碼邏輯
-│   ├── imgproc_logger.cpp        # 核心 Log 系統實現
-│   └── imgproc_utils.cpp         # 狀態碼字串轉換
-├── tests/                        # 自動化測試套件
-│   ├── test_config.toml          # 設定測試檔
-│   ├── test_grayscale_filter.c   # 灰階濾鏡單元測試
-│   ├── test_imgproc_channel.c    # 通道處理單元測試
-│   ├── test_imgproc_config.c     # 設定模組單元測試
-│   ├── test_imgproc_filter_loader.c # 載入器單元測試
-│   ├── test_imgproc_image_io.c   # 圖像 I/O 單元測試
-│   ├── test_imgproc_integration.c# 整合測試
-│   ├── test_imgproc_resize_filter.c # 縮放濾鏡單元測試
-│   └── test_mirror_filter.c     # 鏡像濾鏡單元測試
-├── inputs/                       # 測試/批次輸入圖片目錄
-└── outputs/                      # 批次輸出圖片目錄
+├── CMakeLists.txt              # CMake 建置腳本
+├── README.md                   # 本說明文件
+├── main.cpp                    # CLI 主程式
+├── include/                    # SDK 公開 C API 標頭檔
+│   ├── imgproc_*.h             # 核心模組介面 (Loader, Config, IO, Logger, Channel)
+│   └── stb_image*.h            # 第三方影像編解碼庫
+├── src/                        # 核心庫與濾鏡外掛實作 (C/C++)
+│   ├── dummy_filter.cpp        # 測試用空濾鏡
+│   ├── grayscale_filter.cpp    # 灰階濾鏡
+│   ├── mirror_filter.cpp       # 鏡像濾鏡
+│   ├── resize_filter.cpp       # 縮放濾鏡
+│   ├── rotate_filter.cpp       # 旋轉濾鏡
+│   └── imgproc_*.cpp           # 核心功能實作
+├── tests/                      # 單元與整合測試套件 (CTest)
+├── inputs/                     # 批次處理輸入目錄
+└── outputs/                    # 批次處理輸出目錄
 ```
 
 ---
 
-## 4. 核心模組與 C API 規格 (Core API Reference)
-
-### 4.1 通用資料結構 (`imgproc_utils.h`)
-
-#### `ImgProcImage`
-```c
-struct ImgProcImage {
-    void* data;                       // 圖像原始 RGB/灰階 像素數據緩衝區
-    size_t data_size;                 // 緩衝區位元組大小
-    uint32_t width;                   // 圖像寬度 (像素)
-    uint32_t height;                  // 圖像高度 (像素)
-    uint32_t stride;                  // 每列像素位元組數 (Stride / Pitch)
-    ImgProcImageReleaseFn release_fn; // 圖像釋放自訂 callback 函式
-};
-```
-
-#### 狀態碼 `ImgProcStatus`
-* `IMGPROC_SUCCESS`: 操作成功 (0)
-* `IMGPROC_ERROR_RUNTIME`: 執行階段錯誤
-* `IMGPROC_ERROR_INVALID_ARG`: 無效參數 (如傳入 NULL 指針)
-* `IMGPROC_ERROR_INVALID_CONFIG_FILE`: 無法解析 TOML 設定檔
-* `IMGPROC_ERROR_CONFIG_SECTION_NOT_FOUND`: 找不到 TOML Section
-* `IMGPROC_ERROR_CONFIG_KEY_NOT_FOUND`: 找不到 TOML Key
-* `IMGPROC_ERROR_CONFIG_TYPE_MISMATCH`: 設定型態不符合
-* `IMGPROC_ERROR_OUT_OF_MEMOERY`: 記憶體不足
-* `IMGPROC_ERROR_LOAD_FILTER`: 無法載入動態庫或未定義導出函式
-* `IMGPROC_ERROR_FILTER_SPECIFIC`: 插件內部特定錯誤
-
----
-
-### 4.2 設定讀取模組 (`imgproc_config.h`)
-
-解析 TOML 設定檔並擷取內容：
-- `imgproc_config_load(config_handle, filepath)`：載入並解析 TOML 檔案。
-- `imgproc_config_destroy(config_handle)`：釋放設定檔佔用記憶體。
-- `imgproc_config_get_int64(handle, section, key, &value)`：讀取整數。
-- `imgproc_config_get_double(handle, section, key, &value)`：讀取雙精度浮點數。
-- `imgproc_config_get_boolean(handle, section, key, &value)`：讀取布林值。
-- `imgproc_config_get_string(handle, section, key, &value)`：讀取字串。
-
----
-
-### 4.3 濾鏡動態載入器 (`imgproc_filter_loader.h`)
-
-管理共享庫（`.so`）的動態載入與生命週期：
-- `imgproc_filter_load_api(api, lib_file)`：使用 `dlopen` 載入共享庫，並透過 `dlsym` 獲取 `create`、`destroy` 與 `transform` 函式指標。
-- `imgproc_filter_destroy_api(api)`：釋放共享庫控制權（`dlclose`）。
-
----
-
-### 4.4 圖像 I/O 模組 (`imgproc_image_io.h`)
-
-- `imgproc_image_read(filename, &image)`：讀取圖片並解碼為 RGB 3 通道格式。
-- `imgproc_image_write_jpg(filename, image, quality)`：將圖像寫入為 JPEG（品質 1-100）。
-- `imgproc_image_write_png(filename, image)`：將圖像寫入為 PNG 格式。
-- `imgproc_image_destroy(image)`：調用 `release_fn` 安全釋放圖像記憶體。
-
----
-
-### 4.5 通道提取模組 (`imgproc_channel.h`)
-
-- `imgproc_image_keep_channel(image, keep_ch)`：保留指定之 RGB 通道（`IMGPROC_CHANNEL_R`, `IMGPROC_CHANNEL_G`, `IMGPROC_CHANNEL_B`），將其他通道數值設為 0。
-
----
-
-## 5. 內建濾鏡插件與設定 (Built-in Filters)
-
-| 濾鏡名稱 | 產出庫名稱 | 設定 Section | 設定範例與參數說明 |
-| :--- | :--- | :--- | :--- |
-| **Grayscale** | `libgrayscale_filter.so` | `[grayscale_filter]` | `mode = "luminance"` (或 `"average"`) |
-| **Mirror** | `libmirror_filter.so` | `[mirror_filter]` | `mode = "horizontal"` (或 `"vertical"`, `"both"`) |
-| **Rotate** | `librotate_filter.so` | `[rotate_filter]` | `angle = 90` (支援 90, 180, 270) |
-| **Resize** | `libresize_filter.so` | `[resize_filter]` | `scale = 0.5`, `method = "bilinear"` (或 `"nearest"`) |
-| **Dummy** | `libdummy_filter.so` | `[dummy_filter]` | 無需特定參數（用於測試架構與傳輸） |
-
----
-
-## 6. 自訂濾鏡插件開發指南 (Filter Plugin Development)
-
-要開發新的濾鏡插件，請遵循 C-ABI 導出介面規格：
-
-```cpp
-#include <imgproc_filter_common.h>
-#include <cstdlib>
-#include <cstring>
-
-// 插件內部上下文結構
-typedef struct {
-    double factor;
-} CustomFilterContext;
-
-// 1. 建立濾鏡資源與讀取設定
-extern "C" ImgProcStatus custom_filter_create(ImgProcFilterHandle* handle, ImgProcConfigHandle config) {
-    CustomFilterContext* ctx = new CustomFilterContext{ 1.0 };
-    if (config != IMGPROC_INVALID_CONFIG_HANDLE) {
-        imgproc_config_get_double(config, "custom_filter", "factor", &ctx->factor);
-    }
-    *handle = (ImgProcFilterHandle)ctx;
-    return IMGPROC_SUCCESS;
-}
-
-// 2. 釋放濾鏡資源
-extern "C" ImgProcStatus custom_filter_destroy(ImgProcFilterHandle handle) {
-    if (!handle) return IMGPROC_ERROR_INVALID_ARG;
-    delete (CustomFilterContext*)handle;
-    return IMGPROC_SUCCESS;
-}
-
-// 3. 圖像轉譯處理
-extern "C" ImgProcStatus custom_filter_transform(ImgProcFilterHandle handle, ImgProcImage* input, ImgProcImage** output) {
-    if (!handle || !input || !output) return IMGPROC_ERROR_INVALID_ARG;
-    
-    ImgProcImage* out = new ImgProcImage();
-    out->width = input->width;
-    out->height = input->height;
-    out->stride = input->stride;
-    out->data_size = input->data_size;
-    out->data = std::malloc(out->data_size);
-    out->release_fn = [](ImgProcImage* img) {
-        if (img) {
-            std::free(img->data);
-            img->data = nullptr;
-        }
-    };
-
-    // 進行圖像像素處理...
-    std::memcpy(out->data, input->data, input->data_size);
-
-    *output = out;
-    return IMGPROC_SUCCESS;
-}
-
-// 4. 宣告插件導出函式名稱導出巨集
-IMGPROC_FILTER_DECLARE_CREATE_FN(custom_filter_create)
-IMGPROC_FILTER_DECLARE_DESTROY_FN(custom_filter_destroy)
-IMGPROC_FILTER_DECLARE_TRANSFORM_FN(custom_filter_transform)
-```
-
----
-
-## 7. 編譯與測試說明 (Building & Testing)
+## 🛠️ 編譯與建置 (Build & Install)
 
 ### 系統需求
-* **CMake**: 3.20 或更高版本
-* **C/C++ 編譯器**: 支援 C99 與 C++17（GCC 9+ / Clang 10+ / MSVC 2019+）
-* **建置工具**: Make / Ninja
+- **CMake**: 版本 >= 3.20
+- **編譯器**: 支援 C99 與 C++17 (如 GCC, Clang, 或 MSVC)
 
-### 編譯步驟
+### 建置步驟
 ```bash
-# 1. 建立建置目錄
-mkdir -p build && cd build
+# 1. 建立並進入 build 目錄
+mkdir build && cd build
 
-# 2. 執行 CMake 構建組態
+# 2. 產生建置組態
 cmake ..
 
-# 3. 編譯所有目標 (包含核心庫、濾鏡插件、CLI 與測試專案)
+# 3. 進行編譯 (支援多執行緒)
 make -j$(nproc)
 ```
 
-### 執行單元測試
+### 執行測試
 ```bash
-# 執行所有單元測試與整合測試
+# 在 build 目錄中執行所有 CTest 單元測試
 ctest --output-on-failure
 ```
 
-測試涵蓋以下範疇：
-1. `ConfigTest` (`test_imgproc_config`)：測試 TOML 各種型態解析。
-2. `FilterLoaderTest` (`test_imgproc_filter_loader`)：測試 `.so` 動態載入與 API 指標掛載。
-3. `ImageIOTest` (`test_imgproc_image_io`)：測試 JPEG/PNG 解碼與寫入。
-4. `ImageChannelTest` (`test_imgproc_channel`)：測試 R/G/B 色彩通道過濾。
-5. `GrayscaleFilterTest` (`test_grayscale_filter`)：灰階濾鏡轉譯正確性驗證。
-6. `MirrorFilterTest` (`test_mirror_filter`)：鏡像翻轉演算法驗證。
-
 ---
 
-## 8. CLI 應用程式使用手冊 (CLI Guide)
+## 💻 命令列操作指南 (CLI Usage)
 
-編譯後產生的 CLI 執行檔為 `build/imgproc_app`。
+編譯完成後，執行檔將位於 `build/imgproc_app`。
 
 ### 語法說明
 ```text
-imgproc_app [options]
-
-選項說明:
-  -i, --input <file>     輸入圖像檔案路徑 (JPG/PNG)
-  -o, --output <file>    輸出圖像檔案路徑 (JPG/PNG)
-  -f, --filter <so_path> 濾鏡動態庫 (.so) [可指定多次進行串接]
-  -c, --config <toml>    對應的 TOML 設定檔 [需與 -f 順序對應]
-  -ch, --channel <R|G|B> 提取 RGB 單一色彩通道 (R, G, 或 B)
+Usage: ./imgproc_app [options]
+Options:
+  -i, --input <file>     輸入影像路徑 (JPG/PNG)
+  -o, --output <file>    輸出影像路徑 (JPG/PNG)
+  -f, --filter <so_path> 濾鏡動態庫路徑 (.so)，可多次指定以進行串接
+  -c, --config <toml>    TOML 設定檔路徑，須與 -f 的順序相對應
+  -ch, --channel <R|G|B> 提取特定色彩通道 (R, G, 或 B)
   -h, --help             顯示說明訊息
 ```
 
-### 使用範例
+### 常見範例
 
-#### 範例 1：單一濾鏡處理 (灰階化)
+**1. 單一濾鏡處理 (灰階)**
 ```bash
-./build/imgproc_app -i inputs/test.jpg -o outputs/grayscale.png -f ./build/libgrayscale_filter.so
+./build/imgproc_app -i inputs/sample.jpg -o outputs/gray.png -f ./build/libgrayscale_filter.so
 ```
 
-#### 範例 2：多濾鏡串接處理 (縮放 -> 旋轉 -> 鏡像)
+**2. 濾鏡串接 (縮放 -> 旋轉 -> 鏡像)**
 ```bash
 ./build/imgproc_app \
-  -i inputs/input.png \
-  -o outputs/chained_result.png \
+  -i inputs/sample.png \
+  -o outputs/result.png \
   -f ./build/libresize_filter.so -c tests/test_resize_config.toml \
   -f ./build/librotate_filter.so -c tests/rotate_filter_config.toml \
   -f ./build/libmirror_filter.so -c tests/mirror_filter_config.toml
 ```
 
-#### 範例 3：提取單一色彩通道 (紅色通道)
+**3. 提取色彩通道 (保留紅色通道)**
 ```bash
-./build/imgproc_app -i inputs/photo.jpg -o outputs/red_only.png -ch R
+./build/imgproc_app -i inputs/sample.jpg -o outputs/red.png -ch R
 ```
 
-#### 範例 4：自動批次處理 (Auto Batch Mode)
-如果不帶任何命令列參數，`imgproc_app` 會自動掃描 `inputs/` 目錄中的所有圖片，並對其進行處理後輸出至 `outputs/`：
+**4. 自動批次模式**
+若不加上任何參數，程式將自動讀取 `inputs/` 目錄中的所有圖片，處理後存入 `outputs/` 目錄。
 ```bash
 ./build/imgproc_app
 ```
+
+---
+
+## 🧩 開發自訂濾鏡外掛 (Plugin Development)
+
+您可以輕鬆擴充新的濾鏡。自訂濾鏡需實作 `ImgProcFilterApi` 介面，並匯出三個 C-ABI 函式：`create`, `destroy`, `transform`。
+
+**範例實作框架：**
+```cpp
+#include <imgproc_filter_common.h>
+#include <cstdlib>
+#include <cstring>
+
+// 1. 建立濾鏡與讀取設定
+extern "C" ImgProcStatus my_filter_create(ImgProcFilterHandle* handle, ImgProcConfigHandle config) {
+    // 初始化資源，使用 config 讀取 TOML 參數...
+    *handle = reinterpret_cast<ImgProcFilterHandle>(new int(1)); // 範例
+    return IMGPROC_SUCCESS;
+}
+
+// 2. 釋放濾鏡資源
+extern "C" ImgProcStatus my_filter_destroy(ImgProcFilterHandle handle) {
+    if (handle) delete reinterpret_cast<int*>(handle);
+    return IMGPROC_SUCCESS;
+}
+
+// 3. 執行影像轉換
+extern "C" ImgProcStatus my_filter_transform(ImgProcFilterHandle handle, ImgProcImage* input, ImgProcImage** output) {
+    if (!handle || !input || !output) return IMGPROC_ERROR_INVALID_ARG;
+    
+    // 配置新影像與記憶體
+    ImgProcImage* out = new ImgProcImage();
+    *out = *input; // 複製 metadata
+    out->data = std::malloc(input->data_size);
+    out->release_fn = [](ImgProcImage* img) {
+        if (img && img->data) { std::free(img->data); img->data = nullptr; }
+    };
+    
+    // 實作像素處理邏輯...
+    std::memcpy(out->data, input->data, input->data_size);
+    
+    *output = out;
+    return IMGPROC_SUCCESS;
+}
+
+// 4. 註冊導出函式
+IMGPROC_FILTER_DECLARE_CREATE_FN(my_filter_create)
+IMGPROC_FILTER_DECLARE_DESTROY_FN(my_filter_destroy)
+IMGPROC_FILTER_DECLARE_TRANSFORM_FN(my_filter_transform)
+```
+編譯為 shared library (`.so`) 後，即可使用 `-f` 參數掛載執行！
