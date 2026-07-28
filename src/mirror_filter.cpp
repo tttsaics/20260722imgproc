@@ -39,25 +39,28 @@ IMGPROC_FILTER_DECLARE_TRANSFORM_FN(mirror_filter_transform)
 
 ImgProcStatus mirror_filter_create(ImgProcFilterHandle* filter_handle,
                                    ImgProcConfigHandle filter_config_handle) {
-    if (!filter_handle) {
+    if (!filter_handle) {   
         IMGPROC_LOG_ERROR("'filter_handle' is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    MirrorMode mode = MirrorMode::HORIZONTAL;
+    MirrorMode mode = MirrorMode::HORIZONTAL;   //預設值horizontal
     const char* mode_str = nullptr;
 
     if (filter_config_handle) {
         IMGPROC_LOG_INFO("Reading mirror_filter configuration.");
         ImgProcStatus status =
-            imgproc_config_get_string(filter_config_handle, "mirror_filter", "mode", &mode_str);
+            imgproc_config_get_string(filter_config_handle, "mirror_filter", "mode", &mode_str);//
         if (status == IMGPROC_SUCCESS && mode_str) {
             std::string s(mode_str);
             if (s == "vertical") {
                 mode = MirrorMode::VERTICAL;
             } else if (s == "both") {
                 mode = MirrorMode::BOTH;
-            } else {
+            } else if(s == "horizontal") {
+                mode = MirrorMode::HORIZONTAL;
+            } else{
+                IMGPROC_LOG_WARN("Unknown mirror mode '%s', falling back to 'horizontal'.", s.c_str());
                 mode = MirrorMode::HORIZONTAL;
             }
         } else {
@@ -67,8 +70,8 @@ ImgProcStatus mirror_filter_create(ImgProcFilterHandle* filter_handle,
         IMGPROC_LOG_INFO("Configuration file is not specified, using default mirror mode ('horizontal').");
     }
 
-    MirrorFilter* filter = new (std::nothrow) MirrorFilter;
-    if (!filter) {
+    MirrorFilter* filter = new (std::nothrow) MirrorFilter; //不拋出例外只會回傳nullptr
+    if (!filter) {  
         IMGPROC_LOG_ERROR("Unable to allocate memory for 'MirrorFilter'.");
         return IMGPROC_ERROR_OUT_OF_MEMOERY;
     }
@@ -81,7 +84,8 @@ ImgProcStatus mirror_filter_create(ImgProcFilterHandle* filter_handle,
 }
 
 ImgProcStatus mirror_filter_destroy(ImgProcFilterHandle filter_handle) {
-    MirrorFilter* filter = MIRROR_FILTER_FROM_HANDLE(filter_handle);
+    MirrorFilter* filter = MIRROR_FILTER_FROM_HANDLE(filter_handle); 
+    //利用巨集將對外公開的抽象控制碼 filter_handle（通常是 void*），轉回內部的 C++ MirrorFilter* 指標
     if (filter) {
         delete filter;
         IMGPROC_LOG_INFO("MirrorFilter destroyed.");
@@ -150,7 +154,7 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     bool flip_h = (filter->mode == MirrorMode::HORIZONTAL || filter->mode == MirrorMode::BOTH);
     bool flip_v = (filter->mode == MirrorMode::VERTICAL || filter->mode == MirrorMode::BOTH);
 
-    for (uint32_t y = 0; y < height; ++y) {
+    for (uint32_t y = 0; y < height; ++y) { //避免內層迴圈重新計算
         uint32_t src_y = flip_v ? (height - 1 - y) : y;
         const uint8_t* src_row = src + src_y * stride;
         uint8_t* dst_row = dst + y * stride;
