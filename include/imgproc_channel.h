@@ -21,7 +21,7 @@ typedef enum {
  * @param [in,out] image Pointer to the ImgProcImage to modify.
  * @param [in] keep_ch The channel to keep (R, G, or B).
  */
-void imgproc_image_keep_channel(ImgProcImage* image, ImgProcChannel keep_ch);
+void imgproc_image_keep_channel(ImgProcImage* image, ImgProcChannel keep_ch);// 保留指定的通道，並將其他通道設置為零
 
 #ifdef __cplusplus
 }
