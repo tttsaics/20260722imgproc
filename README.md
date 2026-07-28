@@ -24,35 +24,35 @@
 
 ```mermaid
 flowchart TD
-    subgraph CLI App [命令列主程式 (imgproc_app)]
-        Main[CLI 解析與排程]
-        Batch[自動批次處理]
+    subgraph CLI_App ["命令列主程式 (imgproc_app)"]
+        Main["CLI 解析與排程"]
+        Batch["自動批次處理"]
     end
 
-    subgraph Core SDK [ImgProc 核心函式庫 (libimgproc.so)]
-        Config[TOML 設定模組\n(imgproc_config)]
-        Loader[動態載入器\n(imgproc_filter_loader)]
-        IO[影像 I/O 模組\n(imgproc_image_io)]
-        Channel[通道提取模組\n(imgproc_channel)]
-        Logger[日誌模組\n(imgproc_logger)]
+    subgraph Core_SDK ["ImgProc 核心函式庫 (libimgproc.so)"]
+        Config["TOML 設定模組\n(imgproc_config)"]
+        Loader["動態載入器\n(imgproc_filter_loader)"]
+        IO["影像 I/O 模組\n(imgproc_image_io)"]
+        Channel["通道提取模組\n(imgproc_channel)"]
+        Logger["日誌模組\n(imgproc_logger)"]
     end
 
-    subgraph Dynamic Filters [動態濾鏡外掛 (.so)]
-        Grayscale[grayscale_filter.so]
-        Mirror[mirror_filter.so]
-        Resize[resize_filter.so]
-        Rotate[rotate_filter.so]
-        Dummy[dummy_filter.so]
+    subgraph Dynamic_Filters ["動態濾鏡外掛 (.so)"]
+        Grayscale["grayscale_filter.so"]
+        Mirror["mirror_filter.so"]
+        Resize["resize_filter.so"]
+        Rotate["rotate_filter.so"]
+        Dummy["dummy_filter.so"]
     end
 
     Main --> IO
     Main --> Loader
     Main --> Config
     Main --> Channel
-    Loader -->|dlopen / dlsym| Dynamic Filters
-    Config -->|tomlplusplus| TOML[外部 TOML 設定檔]
-    IO -->|stb_image| Input[輸入 JPEG/PNG]
-    IO -->|stb_image_write| Output[輸出 JPEG/PNG]
+    Loader -->|dlopen / dlsym| Dynamic_Filters
+    Config -->|tomlplusplus| TOML["外部 TOML 設定檔"]
+    IO -->|stb_image| Input["輸入 JPEG/PNG"]
+    IO -->|stb_image_write| Output["輸出 JPEG/PNG"]
 ```
 
 ---
