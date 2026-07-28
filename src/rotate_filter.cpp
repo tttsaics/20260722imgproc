@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <new>
 
 #ifdef __cplusplus
@@ -36,6 +37,7 @@ ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
         IMGPROC_LOG_ERROR("'filter_handle' is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
+    *filter_handle = IMGPROC_INVALID_FILTER_HANDLE;
 
     int32_t angle = 360; 
 
@@ -80,6 +82,11 @@ ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
 }
 
 ImgProcStatus rotate_filter_destroy(ImgProcFilterHandle filter_handle) {
+    if (!filter_handle) {
+        IMGPROC_LOG_ERROR("'filter_handle' is null.");
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
+
     RotateFilter* filter = ROTATE_FILTER_FROM_HANDLE(filter_handle);
     if (filter) {
         delete filter;
@@ -94,6 +101,11 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         IMGPROC_LOG_ERROR("'filter_handle' is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
+    if (!output) {
+        IMGPROC_LOG_ERROR("'output' is null.");
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
+    *output = nullptr;
     if (!input || !input->data) {
         IMGPROC_LOG_ERROR("'input' or input data is null.");
         return IMGPROC_ERROR_INVALID_ARG;
@@ -102,38 +114,62 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         IMGPROC_LOG_ERROR("RotateFilter requires 4-channel RGBA image, got %u.", input->channels);
         return IMGPROC_ERROR_INVALID_ARG;
     }
-    if (!output) {
-        IMGPROC_LOG_ERROR("'output' is null.");
-        return IMGPROC_ERROR_INVALID_ARG;
-    }
-
     RotateFilter* filter = ROTATE_FILTER_FROM_HANDLE(filter_handle);
     int angle = filter->angle;
 
-    uint32_t channels = 4;
+    constexpr uint32_t channels = 4;
 
-   
-    uint32_t new_width = input->width;
-    uint32_t new_height = input->height;
+    const uint32_t input_width = input->width;
+    const uint32_t input_height = input->height;
+    const uint32_t input_stride = input->stride;
+    const size_t input_data_size = input->data_size;
+
+    if (input_width == 0 || input_height == 0) {
+        IMGPROC_LOG_ERROR("Image dimensions must be non-zero (got %ux%u).",
+                          input_width, input_height);
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
+
+    const uint64_t min_input_row_bytes = static_cast<uint64_t>(input_width) * channels;
+    const uint64_t input_required_size = static_cast<uint64_t>(input_stride) * input_height;
+    if (static_cast<uint64_t>(input_stride) < min_input_row_bytes ||
+        input_required_size > static_cast<uint64_t>(input_data_size) ||
+        input_required_size > static_cast<uint64_t>(std::numeric_limits<size_t>::max())) {
+        IMGPROC_LOG_ERROR("Invalid image layout: width=%u height=%u stride=%u data_size=%zu.",
+                          input_width, input_height, input_stride, input_data_size);
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
+
+    uint32_t new_width = input_width;
+    uint32_t new_height = input_height;
 
     if (angle == 90 || angle == 270) {//若角度是 90 or 270長寬要對調
-        new_width = input->height;
-        new_height = input->width;
+        new_width = input_height;
+        new_height = input_width;
     }
 
-    uint32_t new_stride = (new_width * channels + 3) & ~3; 
-    uint64_t total_bytes = static_cast<uint64_t>(new_stride) * new_height;  //避免發生溢位
+    const uint64_t row_bytes = static_cast<uint64_t>(new_width) * channels;
+    const uint64_t new_stride_64 = (row_bytes + 3u) & ~uint64_t(3u);
+    const uint64_t total_bytes = new_stride_64 * new_height;
     
-    if (new_width > 100000 || new_height > 100000 || total_bytes > 2000000000ULL) {
-        IMGPROC_LOG_ERROR("Rotate target dimensions (%ux%u) or buffer size (%lu bytes) overflow limits.",
-                          new_width, new_height, total_bytes);
+    if (new_width > 100000 || new_height > 100000 ||
+        new_stride_64 > std::numeric_limits<uint32_t>::max() ||
+        total_bytes > 2000000000ULL ||
+        total_bytes > static_cast<uint64_t>(std::numeric_limits<size_t>::max())) {
+        IMGPROC_LOG_ERROR("Rotate target dimensions (%ux%u) or buffer size (%llu bytes) exceed limits.",
+                          new_width, new_height,
+                          static_cast<unsigned long long>(total_bytes));
         return IMGPROC_ERROR_OUT_OF_MEMOERY;
     }
+    uint32_t new_stride = static_cast<uint32_t>(new_stride_64);
     size_t new_data_size = static_cast<size_t>(total_bytes);
 
     ImgProcImage* out_img = new (std::nothrow) ImgProcImage;
     if (!out_img) {
         IMGPROC_LOG_ERROR("Failed to allocate ImgProcImage structure.");
+        if (input->release_fn) {
+            input->release_fn(input);
+        }
         return IMGPROC_ERROR_OUT_OF_MEMOERY;
     }
 
@@ -141,6 +177,9 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     if (!out_img->data) {
         delete out_img;
         IMGPROC_LOG_ERROR("Failed to allocate image buffer.");
+        if (input->release_fn) {
+            input->release_fn(input);
+        }
         return IMGPROC_ERROR_OUT_OF_MEMOERY;
     }
 
@@ -178,8 +217,10 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
             }
 
 
-            const uint8_t* src_pixel = src + src_y * input->stride + src_x * channels;
-            uint8_t* dst_pixel = dst + y * new_stride + x * channels;
+            const uint8_t* src_pixel = src + static_cast<size_t>(src_y) * input_stride +
+                                        static_cast<size_t>(src_x) * channels;
+            uint8_t* dst_pixel = dst + static_cast<size_t>(y) * new_stride +
+                                 static_cast<size_t>(x) * channels;
 
             for (uint32_t c = 0; c < channels; ++c) {
                 dst_pixel[c] = src_pixel[c];
@@ -188,13 +229,14 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     }
 
     
+    IMGPROC_LOG_INFO("Image rotated by %d degrees successfully (%dx%d -> %dx%d).",
+                     angle == 0 ? 360 : angle, input_width, input_height, new_width, new_height);
+
     if (input->release_fn) {
         input->release_fn(input);
     }
 
     *output = out_img;
-    IMGPROC_LOG_INFO("Image rotated by %d degrees successfully (%dx%d -> %dx%d).",
-                     angle == 0 ? 360 : angle, input->width, input->height, new_width, new_height);
 
     return IMGPROC_SUCCESS;
 }
