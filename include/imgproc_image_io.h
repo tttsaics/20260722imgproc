@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 /**
- * @brief Read an image from file (JPG/PNG/BMP) and convert to RGB 3-channel format.
+ * @brief Read an image from file (JPG/PNG/BMP) and convert to RGBA 4-channel format.
  *
  * @param [in] filename The NULL-terminated path to the image file.
  * @param [out] image Pointer to receive the allocated @ref ImgProcImage object.

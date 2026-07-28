@@ -137,6 +137,23 @@ target_link_libraries(test_grayscale_filter PRIVATE imgproc ${CMAKE_DL_LIBS})
 add_dependencies(test_grayscale_filter grayscale_filter)
 add_test(NAME GrayscaleFilterTest COMMAND test_grayscale_filter)
 
+# Resize Filter Unit Test
+add_executable(test_imgproc_resize_filter tests/test_imgproc_resize_filter.c)
+target_link_libraries(test_imgproc_resize_filter PRIVATE imgproc ${CMAKE_DL_LIBS})
+add_dependencies(test_imgproc_resize_filter resize_filter)
+add_custom_command(
+    TARGET test_imgproc_resize_filter POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    ${CMAKE_SOURCE_DIR}/tests/test_resize_config.toml
+    ${CMAKE_CURRENT_BINARY_DIR}/test_resize_config.toml)
+add_test(NAME ResizeFilterTest COMMAND test_imgproc_resize_filter)
+
+# Rotate Filter Unit Test
+add_executable(test_rotate_filter tests/test_rotate_filter.c)
+target_link_libraries(test_rotate_filter PRIVATE imgproc ${CMAKE_DL_LIBS})
+add_dependencies(test_rotate_filter rotate_filter)
+add_test(NAME RotateFilterTest COMMAND test_rotate_filter)
+
 # Mirror Filter Unit Test
 add_executable(test_mirror_filter tests/test_mirror_filter.c)
 target_link_libraries(test_mirror_filter PRIVATE imgproc ${CMAKE_DL_LIBS})

@@ -73,6 +73,12 @@ static bool test_write_and_read_image(void) {
         return false;
     }
 
+    if (loaded_img->channels != 4) {
+        fprintf(stderr, "Loaded image channels assertion failed: expected 4, got %u\n", loaded_img->channels);
+        imgproc_image_destroy(loaded_img);
+        return false;
+    }
+
     printf("Successfully read '%s' (Width=%u, Height=%u, Size=%zu bytes)\n",
            input_img_path, loaded_img->width, loaded_img->height, loaded_img->data_size);
 

@@ -37,12 +37,13 @@ typedef struct ImgProcImage ImgProcImage; //設計結構體存放
  */
 typedef void (*ImgProcImageReleaseFn)(ImgProcImage* image); //函式指標，指向釋放圖像資源的函式
 
-struct ImgProcImage { //原始資料處理
+struct ImgProcImage { //原始資料處理 新增channels成員變數，表示每個像素的通道數（1=灰階，3=RGB，4=RGBA）。
     void* data;                       /**< Holds the raw data of image. */
     size_t data_size;                 /**< Holds the data size of @a data */
     uint32_t width;                   /**< Holds the width in pixels of image. */
     uint32_t height;                  /**< Holds the height in pixels of image. */
     uint32_t stride;                  /**< Holds the stride (or pitch) in bytes of image. */
+    uint32_t channels;                /**< Holds the number of channels per pixel (1=Grayscale, 3=RGB, 4=RGBA). */
     ImgProcImageReleaseFn release_fn; /**< Release function of this image. This member can be NULL
                                          if there is no resources needs to release. */
 };

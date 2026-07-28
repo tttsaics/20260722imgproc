@@ -99,6 +99,10 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         IMGPROC_LOG_ERROR("'input' or input data is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
+    if (input->channels != 4) {
+        IMGPROC_LOG_ERROR("MirrorFilter requires 4-channel RGBA image, got %u.", input->channels);
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
     if (!output) {
         IMGPROC_LOG_ERROR("'output' is null.");
         return IMGPROC_ERROR_INVALID_ARG;
@@ -106,12 +110,7 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
 
     MirrorFilter* filter = MIRROR_FILTER_FROM_HANDLE(filter_handle);
 
-    // Detect channels per pixel dynamically from input stride and width
-    uint32_t channels = 3;
-    if (input->width > 0) {
-        channels = input->stride / input->width;
-        if (channels == 0) channels = 3;
-    }
+    uint32_t channels = 4;
 
     uint32_t width = input->width;
     uint32_t height = input->height;
@@ -134,6 +133,7 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     out_img->width = width;
     out_img->height = height;
     out_img->stride = stride;
+    out_img->channels = channels;
     out_img->data_size = data_size;
     out_img->release_fn = [](ImgProcImage* img) {
         if (img) {

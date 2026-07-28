@@ -44,6 +44,25 @@ static ImgProcStatus process_single_image(const std::string& input_path,
                                          const std::string& channel_str) {
     ImgProcStatus status = IMGPROC_SUCCESS;
 
+    // Validate channel_str if provided
+    if (!channel_str.empty()) {
+        std::string ch_upper = channel_str;
+        for (char& c : ch_upper) c = static_cast<char>(std::toupper(c));
+        if (ch_upper != "R" && ch_upper != "G" && ch_upper != "B") {
+            IMGPROC_LOG_ERROR("Invalid channel parameter '%s'. Must be R, G, or B.", channel_str.c_str());
+            return IMGPROC_ERROR_INVALID_ARG;
+        }
+    }
+
+    // Validate output extension
+    std::filesystem::path out_p(output_path);
+    std::string out_ext = out_p.extension().string();
+    for (char& c : out_ext) c = static_cast<char>(std::tolower(c));
+    if (!out_ext.empty() && out_ext != ".jpg" && out_ext != ".jpeg" && out_ext != ".png") {
+        IMGPROC_LOG_ERROR("Unsupported output file extension '%s'. Only .png, .jpg, and .jpeg are supported.", out_ext.c_str());
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
+
     // 1. Read input image using IO module
     ImgProcImage* current_img = nullptr;
     status = imgproc_image_read(input_path.c_str(), &current_img);
@@ -65,8 +84,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
             status = imgproc_config_load(&config_handle, c_path.c_str());
             if (status != IMGPROC_SUCCESS) {
                 IMGPROC_LOG_ERROR("Failed to load config '%s' for filter [%zu].", c_path.c_str(), i);
-                imgproc_image_destroy(current_img);
-                return status;
+                break;
             }
         }
 
@@ -76,8 +94,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
         if (status != IMGPROC_SUCCESS) {
             IMGPROC_LOG_ERROR("Failed to load filter plugin '%s' [%zu].", f_path.c_str(), i);
             if (config_handle != IMGPROC_INVALID_CONFIG_HANDLE) imgproc_config_destroy(config_handle);
-            imgproc_image_destroy(current_img);
-            return status;
+            break;
         }
 
         ImgProcFilterHandle filter_handle = IMGPROC_INVALID_FILTER_HANDLE;
@@ -89,16 +106,15 @@ static ImgProcStatus process_single_image(const std::string& input_path,
         if (status != IMGPROC_SUCCESS) {
             IMGPROC_LOG_ERROR("Failed to create filter handle for plugin '%s' [%zu].", f_path.c_str(), i);
             imgproc_filter_destroy_api(&filter_api);
-            imgproc_image_destroy(current_img);
-            return status;
+            break;
         }
+
+        // Keep API and handle tracked so code segment remains valid until cleanup
+        loaded_apis.push_back(filter_api);
+        active_handles.push_back(filter_handle);
 
         ImgProcImage* next_img = nullptr;
         status = filter_api.transform(filter_handle, current_img, &next_img);
-
-        // Keep API and handle tracked so code segment remains valid until image destruction
-        loaded_apis.push_back(filter_api);
-        active_handles.push_back(filter_handle);
 
         if (status != IMGPROC_SUCCESS || !next_img) {
             IMGPROC_LOG_ERROR("Filter transformation failed for plugin '%s' [%zu].", f_path.c_str(), i);
@@ -125,10 +141,6 @@ static ImgProcStatus process_single_image(const std::string& input_path,
 
     // 4. Save output image using IO module
     if (status == IMGPROC_SUCCESS) {
-        std::filesystem::path out_p(output_path);
-        std::string out_ext = out_p.extension().string();
-        for (char& c : out_ext) c = static_cast<char>(std::tolower(c));
-
         if (out_ext == ".jpg" || out_ext == ".jpeg") {
             status = imgproc_image_write_jpg(output_path.c_str(), current_img, 90);
         } else {
@@ -141,7 +153,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
         imgproc_image_destroy(current_img);
     }
 
-    // 6. Safely destroy filter handles and unload dynamic .so APIs
+    // 6. Safely destroy all loaded filter handles and unload dynamic .so APIs (Leak-proof cleanup)
     for (size_t i = 0; i < loaded_apis.size(); ++i) {
         if (i < active_handles.size() && active_handles[i]) {
             loaded_apis[i].destroy(active_handles[i]);
@@ -204,12 +216,17 @@ int main(int argc, char* argv[]) {
     IMGPROC_LOG_INFO("Running in Auto Batch Mode. Scanning '%s/' directory...", in_dir.c_str());
 
     bool processed_any = false;
+    bool all_success = true;
     for (const auto& entry : std::filesystem::directory_iterator(in_dir)) {
         if (entry.is_regular_file() && is_image_extension(entry.path().string())) {
             std::string in_file = entry.path().string();
             std::string out_file = out_dir + "/" + entry.path().stem().string() + "_processed.png";
             IMGPROC_LOG_INFO("Processing batch file: %s -> %s", in_file.c_str(), out_file.c_str());
-            process_single_image(in_file, out_file, filter_paths, config_paths, channel_str);
+            ImgProcStatus status = process_single_image(in_file, out_file, filter_paths, config_paths, channel_str);
+            if (status != IMGPROC_SUCCESS) {
+                IMGPROC_LOG_ERROR("Failed processing batch file: %s", in_file.c_str());
+                all_success = false;
+            }
             processed_any = true;
         }
     }
@@ -218,5 +235,5 @@ int main(int argc, char* argv[]) {
         IMGPROC_LOG_INFO("No image files found in '%s/'.", in_dir.c_str());
     }
 
-    return EXIT_SUCCESS;
+    return (processed_any && all_success) ? EXIT_SUCCESS : EXIT_FAILURE;
 }

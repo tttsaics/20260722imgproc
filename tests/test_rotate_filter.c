@@ -1,9 +1,8 @@
 /**
- * @file test_grayscale_filter.c
- * @brief Unit test for grayscale_filter plugin.
+ * @file test_rotate_filter.c
+ * @brief Unit test for rotate_filter plugin with 4-channel RGBA support.
  */
 
-#include <imgproc_config.h>
 #include <imgproc_filter_loader.h>
 #include <imgproc_image_io.h>
 #include <imgproc_logger.h>
@@ -24,39 +23,33 @@ int main(void) {
     imgproc_logger_use_console();
     imgproc_logger_set_level(IMGPROC_LOGLEVEL_INFO);
 
-    printf("Running Grayscale Filter Unit Test...\n");
-
-    const char* plugin_path = "./libgrayscale_filter.so";
+    const char* plugin_path = "./librotate_filter.so";
 
     ImgProcFilterApi filter_api;
     memset(&filter_api, 0, sizeof(filter_api));
+
     ImgProcStatus status = imgproc_filter_load_api(&filter_api, plugin_path);
     if (status != IMGPROC_SUCCESS) {
-        fprintf(stderr, "Failed to load grayscale_filter API: %s\n", imgproc_get_status_str(status));
+        fprintf(stderr, "Failed to load rotate_filter API: %s\n", imgproc_get_status_str(status));
         return EXIT_FAILURE;
     }
 
     ImgProcFilterHandle filter_handle = IMGPROC_INVALID_FILTER_HANDLE;
     status = filter_api.create(&filter_handle, IMGPROC_INVALID_CONFIG_HANDLE);
     if (status != IMGPROC_SUCCESS) {
-        fprintf(stderr, "Failed to create grayscale_filter handle: %s\n", imgproc_get_status_str(status));
+        fprintf(stderr, "Failed to create rotate_filter handle: %s\n", imgproc_get_status_str(status));
         imgproc_filter_destroy_api(&filter_api);
         return EXIT_FAILURE;
     }
 
-    // Create synthetic test image (4x4 RGB image with colored pixels)
-    uint32_t width = 4;
-    uint32_t height = 4;
+    // Create synthetic 2x3 RGBA test image
+    uint32_t width = 2;
+    uint32_t height = 3;
     size_t data_size = width * height * 4;
     uint8_t* raw_data = (uint8_t*)malloc(data_size);
     assert(raw_data != NULL);
 
-    for (size_t i = 0; i < width * height; ++i) {
-        raw_data[i * 4 + 0] = 200; // R
-        raw_data[i * 4 + 1] = 100; // G
-        raw_data[i * 4 + 2] = 50;  // B
-        raw_data[i * 4 + 3] = 255; // A
-    }
+    memset(raw_data, 128, data_size);
 
     ImgProcImage input_img;
     memset(&input_img, 0, sizeof(input_img));
@@ -71,37 +64,19 @@ int main(void) {
     ImgProcImage* output_img = NULL;
     status = filter_api.transform(filter_handle, &input_img, &output_img);
     if (status != IMGPROC_SUCCESS || output_img == NULL) {
-        fprintf(stderr, "Grayscale transform failed: %s\n", imgproc_get_status_str(status));
-        free(raw_data);
+        fprintf(stderr, "Rotate transform failed: %s\n", imgproc_get_status_str(status));
         filter_api.destroy(filter_handle);
         imgproc_filter_destroy_api(&filter_api);
         return EXIT_FAILURE;
     }
 
     assert(output_img->channels == 4);
-    uint8_t* out_data = (uint8_t*)output_img->data;
-    bool check_passed = true;
-    for (size_t i = 0; i < width * height; ++i) {
-        uint8_t r = out_data[i * 4 + 0];
-        uint8_t g = out_data[i * 4 + 1];
-        uint8_t b = out_data[i * 4 + 2];
-        uint8_t a = out_data[i * 4 + 3];
-        if (r != g || g != b || r != 124 || a != 255) {
-            fprintf(stderr, "Pixel mismatch at index %zu: R=%d, G=%d, B=%d, A=%d (expected 124,124,124,255)\n", i, r, g, b, a);
-            check_passed = false;
-            break;
-        }
-    }
+    assert(output_img->data != NULL);
 
     imgproc_image_destroy(output_img);
-    free_test_data(&input_img);
     filter_api.destroy(filter_handle);
     imgproc_filter_destroy_api(&filter_api);
 
-    if (check_passed) {
-        printf("Grayscale Filter Unit Test Passed Successfully!\n");
-        return EXIT_SUCCESS;
-    } else {
-        return EXIT_FAILURE;
-    }
+    printf("RotateFilter unit test PASSED successfully!\n");
+    return EXIT_SUCCESS;
 }

@@ -48,7 +48,11 @@ ImgProcStatus resize_filter_create(ImgProcFilterHandle* filter_handle, ImgProcCo
         double temp_scale = 0.0;
         ImgProcStatus status = imgproc_config_get_double(filter_config_handle, "resize_filter", "scale", &temp_scale);
         if (status == IMGPROC_SUCCESS) {
-            scale = temp_scale;
+            if (std::isfinite(temp_scale) && temp_scale > 0.0 && temp_scale <= 100.0) {
+                scale = temp_scale;
+            } else {
+                IMGPROC_LOG_WARN("Configured scale (%f) is invalid or non-finite. Using default (1.0).", temp_scale);
+            }
         }
 
         int64_t temp_width = 0;
@@ -75,8 +79,8 @@ ImgProcStatus resize_filter_create(ImgProcFilterHandle* filter_handle, ImgProcCo
     }
 
     filter->scale = scale;
-    filter->width = static_cast<int32_t>(width);
-    filter->height = static_cast<int32_t>(height);
+    filter->width = (width >= INT32_MIN && width <= INT32_MAX) ? static_cast<int32_t>(width) : 0;
+    filter->height = (height >= INT32_MIN && height <= INT32_MAX) ? static_cast<int32_t>(height) : 0;
     if (method_str) {
         filter->method = method_str;
     } else {
@@ -108,6 +112,10 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         IMGPROC_LOG_ERROR("'input' or input data is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
+    if (input->channels != 4) {
+        IMGPROC_LOG_ERROR("ResizeFilter requires 4-channel RGBA image, got %u.", input->channels);
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
     if (!output) {
         IMGPROC_LOG_ERROR("'output' is null.");
         return IMGPROC_ERROR_INVALID_ARG;
@@ -122,28 +130,37 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     if (filter->width > 0 && filter->height > 0) {
         new_width = static_cast<uint32_t>(filter->width);
         new_height = static_cast<uint32_t>(filter->height);
-    } else if (filter->scale > 0.0) {
-        new_width = static_cast<uint32_t>(std::round(input->width * filter->scale));
-        new_height = static_cast<uint32_t>(std::round(input->height * filter->scale));
+    } else if (std::isfinite(filter->scale) && filter->scale > 0.0) {
+        double calc_w = std::round(input->width * filter->scale);
+        double calc_h = std::round(input->height * filter->scale);
+        if (std::isfinite(calc_w) && std::isfinite(calc_h) && calc_w >= 1.0 && calc_w <= 100000.0 && calc_h >= 1.0 && calc_h <= 100000.0) {
+            new_width = static_cast<uint32_t>(calc_w);
+            new_height = static_cast<uint32_t>(calc_h);
+        } else {
+            IMGPROC_LOG_ERROR("Calculated scale dimensions (%f, %f) out of safe range [1, 100000].", calc_w, calc_h);
+            return IMGPROC_ERROR_INVALID_ARG;
+        }
+    } else {
+        IMGPROC_LOG_ERROR("Invalid scale value: %f. Must be a finite positive number.", filter->scale);
+        return IMGPROC_ERROR_INVALID_ARG;
     }
 
     if (new_width == 0) new_width = 1;
     if (new_height == 0) new_height = 1;
 
-    // Detect number of channels per pixel dynamically from input stride and width
-    uint32_t channels = 3; // Default fallback to RGB (3 channels)
-    if (input->width > 0) {
-        channels = input->stride / input->width;
-        if (channels == 0) {
-            channels = 3;
-        }
-    }
-
+    uint32_t channels = 4;
     uint32_t new_stride = new_width * channels;
     // Align stride to a multiple of 4 bytes
     new_stride = (new_stride + 3) & ~3;
 
-    size_t new_data_size = new_stride * new_height;
+    uint64_t total_bytes = static_cast<uint64_t>(new_stride) * new_height;
+    if (new_width > 100000 || new_height > 100000 || total_bytes > 2000000000ULL) {
+        IMGPROC_LOG_ERROR("Resize target dimensions (%ux%u) or buffer size (%lu bytes) overflow limits.",
+                          new_width, new_height, total_bytes);
+        return IMGPROC_ERROR_OUT_OF_MEMOERY;
+    }
+
+    size_t new_data_size = static_cast<size_t>(total_bytes);
 
     // Allocate output ImgProcImage struct dynamically on the heap
     ImgProcImage* out_img = new (std::nothrow) ImgProcImage;
@@ -162,6 +179,7 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     out_img->width = new_width;
     out_img->height = new_height;
     out_img->stride = new_stride;
+    out_img->channels = channels;
     out_img->data_size = new_data_size;
     out_img->release_fn = [](ImgProcImage* img) {
         if (img) {

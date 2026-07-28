@@ -61,16 +61,16 @@ ImgProcStatus grayscale_filter_transform(ImgProcFilterHandle filter_handle, ImgP
         IMGPROC_LOG_ERROR("Input image or image data is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
+    if (input->channels != 4) {
+        IMGPROC_LOG_ERROR("GrayscaleFilter requires 4-channel RGBA image, got %u.", input->channels);
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
     if (!output) {
         IMGPROC_LOG_ERROR("'output' pointer is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    uint32_t bpp = (input->width > 0) ? (input->stride / input->width) : 0;
-    if (bpp < 3) {
-        IMGPROC_LOG_ERROR("Unsupported image format: bytes per pixel must be >= 3.");
-        return IMGPROC_ERROR_INVALID_ARG;
-    }
+    uint32_t bpp = 4;
 
     ImgProcImage* out_img = new (std::nothrow) ImgProcImage;
     if (!out_img) {
@@ -88,6 +88,7 @@ ImgProcStatus grayscale_filter_transform(ImgProcFilterHandle filter_handle, ImgP
     out_img->width = input->width;
     out_img->height = input->height;
     out_img->stride = input->stride;
+    out_img->channels = bpp;
     out_img->data_size = input->data_size;
     out_img->release_fn = [](ImgProcImage* img) {
         if (img) {

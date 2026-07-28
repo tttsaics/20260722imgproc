@@ -45,7 +45,11 @@ ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
         ImgProcStatus status =
             imgproc_config_get_int64(filter_config_handle, "rotate_filter", "angle", &config_angle);
         if (status == IMGPROC_SUCCESS) {
-            angle = static_cast<int32_t>(config_angle);
+            if (config_angle >= INT32_MIN && config_angle <= INT32_MAX) {
+                angle = static_cast<int32_t>(config_angle);
+            } else {
+                IMGPROC_LOG_WARN("Config angle %ld out of int32 bounds, using default (%d).", config_angle, angle);
+            }
         } else {
             IMGPROC_LOG_WARN("Unable to get 'rotate_filter.angle', using default value (%d).", angle);
         }
@@ -94,6 +98,10 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         IMGPROC_LOG_ERROR("'input' or input data is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
+    if (input->channels != 4) {
+        IMGPROC_LOG_ERROR("RotateFilter requires 4-channel RGBA image, got %u.", input->channels);
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
     if (!output) {
         IMGPROC_LOG_ERROR("'output' is null.");
         return IMGPROC_ERROR_INVALID_ARG;
@@ -102,12 +110,7 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     RotateFilter* filter = ROTATE_FILTER_FROM_HANDLE(filter_handle);
     int angle = filter->angle;
 
-    // Detect channels per pixel
-    uint32_t channels = 3;
-    if (input->width > 0) {
-        channels = input->stride / input->width;
-        if (channels == 0) channels = 3;
-    }
+    uint32_t channels = 4;
 
     // Determine target width and height
     uint32_t new_width = input->width;
@@ -119,7 +122,13 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     }
 
     uint32_t new_stride = (new_width * channels + 3) & ~3; // 4-byte aligned
-    size_t new_data_size = static_cast<size_t>(new_stride) * new_height;
+    uint64_t total_bytes = static_cast<uint64_t>(new_stride) * new_height;
+    if (new_width > 100000 || new_height > 100000 || total_bytes > 2000000000ULL) {
+        IMGPROC_LOG_ERROR("Rotate target dimensions (%ux%u) or buffer size (%lu bytes) overflow limits.",
+                          new_width, new_height, total_bytes);
+        return IMGPROC_ERROR_OUT_OF_MEMOERY;
+    }
+    size_t new_data_size = static_cast<size_t>(total_bytes);
 
     ImgProcImage* out_img = new (std::nothrow) ImgProcImage;
     if (!out_img) {
@@ -137,6 +146,7 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     out_img->width = new_width;
     out_img->height = new_height;
     out_img->stride = new_stride;
+    out_img->channels = channels;
     out_img->data_size = new_data_size;
     out_img->release_fn = [](ImgProcImage* img) {
         if (img) {

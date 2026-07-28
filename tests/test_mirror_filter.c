@@ -49,13 +49,13 @@ int main(void) {
     // Pixel (0,1): (70, 80, 90)   Pixel (1,1): (100, 110, 120)
     uint32_t width = 2;
     uint32_t height = 2;
-    size_t data_size = width * height * 3;
+    size_t data_size = width * height * 4;
     uint8_t* raw_data = (uint8_t*)malloc(data_size);
     assert(raw_data != NULL);
 
-    uint8_t init_pixels[4][3] = {
-        {10, 20, 30},    {40, 50, 60},
-        {70, 80, 90},    {100, 110, 120}
+    uint8_t init_pixels[4][4] = {
+        {10, 20, 30, 255},    {40, 50, 60, 255},
+        {70, 80, 90, 255},    {100, 110, 120, 255}
     };
     memcpy(raw_data, init_pixels, sizeof(init_pixels));
 
@@ -65,7 +65,8 @@ int main(void) {
     input_img.data_size = data_size;
     input_img.width = width;
     input_img.height = height;
-    input_img.stride = width * 3;
+    input_img.stride = width * 4;
+    input_img.channels = 4;
     input_img.release_fn = free_test_data;
 
     ImgProcImage* output_img = NULL;
@@ -84,20 +85,22 @@ int main(void) {
     // Pixel (1,0) should be original (0,0) -> (10, 20, 30)
     // Pixel (0,1) should be original (1,1) -> (100, 110, 120)
     // Pixel (1,1) should be original (0,1) -> (70, 80, 90)
-    uint8_t expected[4][3] = {
-        {40, 50, 60},    {10, 20, 30},
-        {100, 110, 120},  {70, 80, 90}
+    assert(output_img->channels == 4);
+    uint8_t expected[4][4] = {
+        {40, 50, 60, 255},    {10, 20, 30, 255},
+        {100, 110, 120, 255},  {70, 80, 90, 255}
     };
 
     uint8_t* out_data = (uint8_t*)output_img->data;
     bool check_passed = true;
     for (size_t i = 0; i < 4; ++i) {
-        if (out_data[i * 3 + 0] != expected[i][0] ||
-            out_data[i * 3 + 1] != expected[i][1] ||
-            out_data[i * 3 + 2] != expected[i][2]) {
-            fprintf(stderr, "Pixel mismatch at idx %zu: got (%d,%d,%d), expected (%d,%d,%d)\n",
-                    i, out_data[i * 3 + 0], out_data[i * 3 + 1], out_data[i * 3 + 2],
-                    expected[i][0], expected[i][1], expected[i][2]);
+        if (out_data[i * 4 + 0] != expected[i][0] ||
+            out_data[i * 4 + 1] != expected[i][1] ||
+            out_data[i * 4 + 2] != expected[i][2] ||
+            out_data[i * 4 + 3] != expected[i][3]) {
+            fprintf(stderr, "Pixel mismatch at idx %zu: got (%d,%d,%d,%d), expected (%d,%d,%d,%d)\n",
+                    i, out_data[i * 4 + 0], out_data[i * 4 + 1], out_data[i * 4 + 2], out_data[i * 4 + 3],
+                    expected[i][0], expected[i][1], expected[i][2], expected[i][3]);
             check_passed = false;
             break;
         }
