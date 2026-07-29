@@ -29,6 +29,7 @@ static bool is_image_extension(const std::string& filename) {
     // 透過 std::filesystem 解析副檔名並轉小寫比對。
     std::filesystem::path p(filename);
     std::string ext = p.extension().string();
+    // 轉成小寫字母，確保相機或外接檔案全大寫副檔名（如 .PNG / .JPG）能大小寫不敏感 (Case-Insensitive) 相容。
     for (char& c : ext) c = static_cast<char>(std::tolower(c));
     return (ext == ".jpg" || ext == ".jpeg" || ext == ".png");
 }
@@ -86,12 +87,12 @@ static ImgProcStatus process_single_image(const std::string& input_path,
             }
         }
 
-        // 動態載入 .so 外掛的 API 函數指標。
-        ImgProcFilterApi filter_api;
-        std::memset(&filter_api, 0, sizeof(filter_api));
+        // 動態載入 .so 外掛的 API 函數指標（使用 C++11 {} 值初始化自動安全歸零）。
+        ImgProcFilterApi filter_api{};
         status = imgproc_filter_load_api(&filter_api, f_path.c_str());
         if (status != IMGPROC_SUCCESS) {
             IMGPROC_LOG_ERROR("Failed to load filter plugin '%s' [%zu].", f_path.c_str(), i);
+            // 載入失敗早退分支 (Early Exit)：必須銷毀已配置的 config_handle 防範記憶體洩漏。
             if (config_handle != IMGPROC_INVALID_CONFIG_HANDLE) imgproc_config_destroy(config_handle);
             break;
         }
@@ -149,7 +150,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
         }
     }
 
-    // 7. 【重點順序】：先銷毀最終影像物件（觸發 release_fn 閉包），必須在卸載 .so 動態庫之前完成！
+    // 7. 先銷毀最終影像物件（觸發 release_fn 閉包），必須在卸載 .so 動態庫之前完成！
     if (current_img) {
         imgproc_image_destroy(current_img);
     }
@@ -207,6 +208,7 @@ int main(int argc, char* argv[]) {
     // 自動批次處理模式 (Auto Batch Mode)：若無 CLI 參數，自動掃描 inputs/ 資料夾。
     std::string in_dir = "inputs";
     std::string out_dir = "outputs";
+    // 工作目錄自適應：當在 build/ 子目錄執行時降級指向 ../inputs，雙重檢查防範空目錄無效重定向。
     if (!std::filesystem::exists(in_dir) && std::filesystem::exists("../inputs")) {
         in_dir = "../inputs";
         out_dir = "../outputs";
@@ -239,6 +241,6 @@ int main(int argc, char* argv[]) {
         IMGPROC_LOG_INFO("No image files found in '%s/'.", in_dir.c_str());
     }
 
-    // 批次模式傳回狀態：若有圖片處理失敗，回傳 EXIT_FAILURE。
+    // 批次 Exit Code 雙重防衛：必須同時保證有實質處理圖片 (processed_any) 且全數成功 (all_success)，防範空目錄假成功 (False Positive)。
     return (processed_any && all_success) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
