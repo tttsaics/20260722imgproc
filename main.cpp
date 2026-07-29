@@ -241,6 +241,6 @@ int main(int argc, char* argv[]) {
         IMGPROC_LOG_INFO("No image files found in '%s/'.", in_dir.c_str());
     }
 
-    // 批次 Exit Code 雙重防衛：必須同時保證有實質處理圖片 (processed_any) 且全數成功 (all_success)，防範空目錄假成功 (False Positive)。
+    // 批次 Exit Code 雙重防衛：必須同時保證有實質處理圖片且全數成功，防範空目錄假成功。
     return (processed_any && all_success) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
