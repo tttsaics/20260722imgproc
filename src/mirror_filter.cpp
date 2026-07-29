@@ -3,6 +3,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <new>
 #include <string>
 
@@ -43,6 +44,7 @@ ImgProcStatus mirror_filter_create(ImgProcFilterHandle* filter_handle,
         IMGPROC_LOG_ERROR("'filter_handle' is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
+    *filter_handle = IMGPROC_INVALID_FILTER_HANDLE;
 
     MirrorMode mode = MirrorMode::HORIZONTAL;   //預設值horizontal
     const char* mode_str = nullptr;
@@ -84,6 +86,11 @@ ImgProcStatus mirror_filter_create(ImgProcFilterHandle* filter_handle,
 }
 
 ImgProcStatus mirror_filter_destroy(ImgProcFilterHandle filter_handle) {
+    if (!filter_handle) {
+        IMGPROC_LOG_ERROR("'filter_handle' is null.");
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
+
     MirrorFilter* filter = MIRROR_FILTER_FROM_HANDLE(filter_handle); 
     //利用巨集將對外公開的抽象控制碼 filter_handle（通常是 void*），轉回內部的 C++ MirrorFilter* 指標
     if (filter) {
@@ -99,6 +106,11 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         IMGPROC_LOG_ERROR("'filter_handle' is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
+    if (!output) {
+        IMGPROC_LOG_ERROR("'output' is null.");
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
+    *output = nullptr;
     if (!input || !input->data) {
         IMGPROC_LOG_ERROR("'input' or input data is null.");
         return IMGPROC_ERROR_INVALID_ARG;
@@ -107,23 +119,37 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         IMGPROC_LOG_ERROR("MirrorFilter requires 4-channel RGBA image, got %u.", input->channels);
         return IMGPROC_ERROR_INVALID_ARG;
     }
-    if (!output) {
-        IMGPROC_LOG_ERROR("'output' is null.");
-        return IMGPROC_ERROR_INVALID_ARG;
-    }
-
     MirrorFilter* filter = MIRROR_FILTER_FROM_HANDLE(filter_handle);
 
-    uint32_t channels = 4;
+    constexpr uint32_t channels = 4;
 
     uint32_t width = input->width;
     uint32_t height = input->height;
     uint32_t stride = input->stride;
     size_t data_size = input->data_size;
 
+    
+    if (width == 0 || height == 0) {//避免引發除以0的硬體例外
+        IMGPROC_LOG_ERROR("Image dimensions must be non-zero (got %ux%u).", width, height);
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
+    //避免溢位  
+    const uint64_t min_row_bytes = static_cast<uint64_t>(width) * channels;
+    const uint64_t required_size = static_cast<uint64_t>(stride) * height;
+    if (static_cast<uint64_t>(stride) < min_row_bytes ||
+        required_size > static_cast<uint64_t>(data_size) ||
+        required_size > static_cast<uint64_t>(std::numeric_limits<size_t>::max())) {
+        IMGPROC_LOG_ERROR("Invalid image layout: width=%u height=%u stride=%u data_size=%zu.",
+                          width, height, stride, data_size);
+        return IMGPROC_ERROR_INVALID_ARG;
+    }
+
     ImgProcImage* out_img = new (std::nothrow) ImgProcImage;
     if (!out_img) {
         IMGPROC_LOG_ERROR("Failed to allocate ImgProcImage structure.");
+        if (input->release_fn) {
+            input->release_fn(input);
+        }
         return IMGPROC_ERROR_OUT_OF_MEMOERY;
     }
 
@@ -131,6 +157,9 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     if (!out_img->data) {
         delete out_img;
         IMGPROC_LOG_ERROR("Failed to allocate image buffer.");
+        if (input->release_fn) {
+            input->release_fn(input);
+        }
         return IMGPROC_ERROR_OUT_OF_MEMOERY;
     }
 
@@ -151,19 +180,22 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     const uint8_t* src = static_cast<const uint8_t*>(input->data);
     uint8_t* dst = static_cast<uint8_t*>(out_img->data);
 
+    
+    std::memcpy(dst, src, data_size);
+
     bool flip_h = (filter->mode == MirrorMode::HORIZONTAL || filter->mode == MirrorMode::BOTH);
     bool flip_v = (filter->mode == MirrorMode::VERTICAL || filter->mode == MirrorMode::BOTH);
 
     for (uint32_t y = 0; y < height; ++y) { //避免內層迴圈重新計算
         uint32_t src_y = flip_v ? (height - 1 - y) : y;
-        const uint8_t* src_row = src + src_y * stride;
-        uint8_t* dst_row = dst + y * stride;
+        const uint8_t* src_row = src + static_cast<size_t>(src_y) * stride;
+        uint8_t* dst_row = dst + static_cast<size_t>(y) * stride;
 
         for (uint32_t x = 0; x < width; ++x) {
             uint32_t src_x = flip_h ? (width - 1 - x) : x;
 
-            const uint8_t* src_pixel = src_row + src_x * channels;
-            uint8_t* dst_pixel = dst_row + x * channels;
+            const uint8_t* src_pixel = src_row + static_cast<size_t>(src_x) * channels;
+            uint8_t* dst_pixel = dst_row + static_cast<size_t>(x) * channels;
 
             for (uint32_t c = 0; c < channels; ++c) {
                 dst_pixel[c] = src_pixel[c];
@@ -176,7 +208,7 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     }
 
     *output = out_img;
-    IMGPROC_LOG_INFO("Image mirrored successfully (%dx%d).", width, height);
+    IMGPROC_LOG_INFO("Image mirrored successfully (%ux%u).", width, height);
 
     return IMGPROC_SUCCESS;
 }
