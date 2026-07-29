@@ -27,9 +27,9 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
 }
 #endif
 
-IMGPROC_FILTER_DECLARE_CREATE_FN(rotate_filter_create)
-IMGPROC_FILTER_DECLARE_DESTROY_FN(rotate_filter_destroy)
-IMGPROC_FILTER_DECLARE_TRANSFORM_FN(rotate_filter_transform)
+IMGPROC_FILTER_DECLARE_CREATE_FN(rotate_filter_create)  //註冊濾鏡創建入口涵式
+IMGPROC_FILTER_DECLARE_DESTROY_FN(rotate_filter_destroy)//註冊濾鏡銷毀入口涵式
+IMGPROC_FILTER_DECLARE_TRANSFORM_FN(rotate_filter_transform)//註冊濾鏡轉換入口涵式
 
 ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
                                    ImgProcConfigHandle filter_config_handle) {
@@ -55,7 +55,7 @@ ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
         } else {
             IMGPROC_LOG_WARN("Unable to get 'rotate_filter.angle', using default value (%d).", angle);
         }
-    } else {
+    } else {    
         IMGPROC_LOG_INFO("Configuration file is not specified, using default angle (%d).", angle);
     }
 
@@ -68,7 +68,7 @@ ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    RotateFilter* filter = new (std::nothrow) RotateFilter;
+    RotateFilter* filter = new (std::nothrow) RotateFilter; // 動態分配 RotateFilter 記憶體，不拋出例外
     if (!filter) {
         IMGPROC_LOG_ERROR("Unable to allocate memory for 'RotateFilter'.");
         return IMGPROC_ERROR_OUT_OF_MEMOERY;
@@ -152,7 +152,8 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     const uint64_t new_stride_64 = (row_bytes + 3u) & ~uint64_t(3u);
     const uint64_t total_bytes = new_stride_64 * new_height;
     
-    if (new_width > 100000 || new_height > 100000 ||
+    //檢查新圖像尺寸與記憶體大小上限，避免記憶體過大導致系統崩潰
+    if (new_width > 100000 || new_height > 100000 ||    
         new_stride_64 > std::numeric_limits<uint32_t>::max() ||
         total_bytes > 2000000000ULL ||
         total_bytes > static_cast<uint64_t>(std::numeric_limits<size_t>::max())) {
