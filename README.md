@@ -60,22 +60,22 @@ flowchart TD
 ## 📂 專案目錄結構 (Directory Structure)
 
 ```text
-├── CMakeLists.txt              # CMake 建置腳本
-├── README.md                   # 本說明文件
-├── main.cpp                    # CLI 主程式
-├── include/                    # SDK 公開 C API 標頭檔
-│   ├── imgproc_*.h             # 核心模組介面 (Loader, Config, IO, Logger, Channel)
-│   └── stb_image*.h            # 第三方影像編解碼庫
-├── src/                        # 核心庫與濾鏡外掛實作 (C/C++)
-│   ├── dummy_filter.cpp        # 測試用空濾鏡
-│   ├── grayscale_filter.cpp    # 灰階濾鏡
-│   ├── mirror_filter.cpp       # 鏡像濾鏡
-│   ├── resize_filter.cpp       # 縮放濾鏡
-│   ├── rotate_filter.cpp       # 旋轉濾鏡
-│   └── imgproc_*.cpp           # 核心功能實作
-├── tests/                      # 單元與整合測試套件 (CTest)
-├── inputs/                     # 批次處理輸入目錄
-└── outputs/                    # 批次處理輸出目錄
+├── CMakeLists.txt
+├── README.md
+├── main.cpp
+├── include/
+│   ├── imgproc_*.h
+│   └── stb_image*.h
+├── src/
+│   ├── dummy_filter.cpp
+│   ├── grayscale_filter.cpp
+│   ├── mirror_filter.cpp
+│   ├── resize_filter.cpp
+│   ├── rotate_filter.cpp
+│   └── imgproc_*.cpp
+├── tests/
+├── inputs/
+└── outputs/
 ```
 
 ---
@@ -88,19 +88,15 @@ flowchart TD
 
 ### 建置步驟
 ```bash
-# 1. 建立並進入 build 目錄
 mkdir build && cd build
 
-# 2. 產生建置組態
 cmake ..
 
-# 3. 進行編譯 (支援多執行緒)
 make -j$(nproc)
 ```
 
 ### 執行測試
 ```bash
-# 在 build 目錄中執行所有 CTest 單元測試
 ctest --output-on-failure
 ```
 
@@ -162,39 +158,32 @@ Options:
 #include <cstdlib>
 #include <cstring>
 
-// 1. 建立濾鏡與讀取設定
 extern "C" ImgProcStatus my_filter_create(ImgProcFilterHandle* handle, ImgProcConfigHandle config) {
-    // 初始化資源，使用 config 讀取 TOML 參數...
-    *handle = reinterpret_cast<ImgProcFilterHandle>(new int(1)); // 範例
+    *handle = reinterpret_cast<ImgProcFilterHandle>(new int(1));
     return IMGPROC_SUCCESS;
 }
 
-// 2. 釋放濾鏡資源
 extern "C" ImgProcStatus my_filter_destroy(ImgProcFilterHandle handle) {
     if (handle) delete reinterpret_cast<int*>(handle);
     return IMGPROC_SUCCESS;
 }
 
-// 3. 執行影像轉換
 extern "C" ImgProcStatus my_filter_transform(ImgProcFilterHandle handle, ImgProcImage* input, ImgProcImage** output) {
     if (!handle || !input || !output) return IMGPROC_ERROR_INVALID_ARG;
     
-    // 配置新影像與記憶體
     ImgProcImage* out = new ImgProcImage();
-    *out = *input; // 複製 metadata
+    *out = *input;
     out->data = std::malloc(input->data_size);
     out->release_fn = [](ImgProcImage* img) {
         if (img && img->data) { std::free(img->data); img->data = nullptr; }
     };
     
-    // 實作像素處理邏輯...
     std::memcpy(out->data, input->data, input->data_size);
     
     *output = out;
     return IMGPROC_SUCCESS;
 }
 
-// 4. 註冊導出函式
 IMGPROC_FILTER_DECLARE_CREATE_FN(my_filter_create)
 IMGPROC_FILTER_DECLARE_DESTROY_FN(my_filter_destroy)
 IMGPROC_FILTER_DECLARE_TRANSFORM_FN(my_filter_transform)
