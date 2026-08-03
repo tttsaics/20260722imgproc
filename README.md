@@ -14,7 +14,7 @@
 - 🔌 **動態外掛系統 (Dynamic Plugin Architecture)**: 濾鏡模組透過 C-ABI 導出介面，在執行期使用 `dlopen/dlsym` 載入，主程式與濾鏡高度解耦。
 - 🔗 **濾鏡串接 (Filter Chaining)**: 支援在命令列依序指定多個濾鏡與對應的設定檔，無縫建立影像處理管線。
 - ⚙️ **TOML 設定解析**: 內建 `tomlplusplus` 整合，讓動態濾鏡可輕鬆讀取外部的數值與字串設定。
-- 🖼️ **主流格式支援**: 基於 `stb_image` 實作，完整支援 JPEG、PNG 與 BMP 檔案解碼與編碼。
+- 🖼️ **主流格式支援**: 基於 `stb_image` 實作，支援 JPEG、PNG 與 BMP 檔案解碼，以及 JPEG 與 PNG 檔案編碼輸出。
 - 🛡️ **安全的記憶體管理**: 使用自訂的資源釋放回呼函式 (`release_fn`)，確保各動態濾鏡在轉譯過程中的記憶體分配能夠被正確回收，防止記憶體洩漏。
 - 🚀 **自動批次處理 (Auto Batch Mode)**: 在不指定參數的情況下，CLI 將自動掃描 `inputs/` 目錄並將處理後的結果輸出至 `outputs/`。
 
@@ -38,11 +38,11 @@ flowchart TD
     end
 
     subgraph Dynamic_Filters ["動態濾鏡外掛 (.so)"]
-        Grayscale["grayscale_filter.so"]
-        Mirror["mirror_filter.so"]
-        Resize["resize_filter.so"]
-        Rotate["rotate_filter.so"]
-        Dummy["dummy_filter.so"]
+        Grayscale["libgrayscale_filter.so"]
+        Mirror["libmirror_filter.so"]
+        Resize["libresize_filter.so"]
+        Rotate["librotate_filter.so"]
+        Dummy["libdummy_filter.so"]
     end
 
     Main --> IO
@@ -51,7 +51,7 @@ flowchart TD
     Main --> Channel
     Loader -->|dlopen / dlsym| Dynamic_Filters
     Config -->|tomlplusplus| TOML["外部 TOML 設定檔"]
-    IO -->|stb_image| Input["輸入 JPEG/PNG"]
+    IO -->|stb_image| Input["輸入 JPEG/PNG/BMP"]
     IO -->|stb_image_write| Output["輸出 JPEG/PNG"]
 ```
 
@@ -67,6 +67,7 @@ flowchart TD
 │   ├── imgproc_*.h             # 核心模組介面 (Loader, Config, IO, Logger, Channel)
 │   └── stb_image*.h            # 第三方影像編解碼庫
 ├── src/                        # 核心庫與濾鏡外掛實作 (C/C++)
+│   ├── priv/                   # 內部私有標頭檔 (imgproc_helper.h)
 │   ├── dummy_filter.cpp        # 測試用空濾鏡
 │   ├── grayscale_filter.cpp    # 灰階濾鏡
 │   ├── mirror_filter.cpp       # 鏡像濾鏡
@@ -114,7 +115,7 @@ ctest --output-on-failure
 ```text
 Usage: ./imgproc_app [options]
 Options:
-  -i, --input <file>     輸入影像路徑 (JPG/PNG)
+  -i, --input <file>     輸入影像路徑 (JPG/PNG/BMP)
   -o, --output <file>    輸出影像路徑 (JPG/PNG)
   -f, --filter <so_path> 濾鏡動態庫路徑 (.so)，可多次指定以進行串接
   -c, --config <toml>    TOML 設定檔路徑，須與 -f 的順序相對應
@@ -189,6 +190,11 @@ extern "C" ImgProcStatus my_filter_transform(ImgProcFilterHandle handle, ImgProc
     
     // 實作像素處理邏輯...
     std::memcpy(out->data, input->data, input->data_size);
+    
+    // 釋放傳入之輸入影像資料記憶體（依據 ImgProcFilterTransformFn 規範）
+    if (input->release_fn) {
+        input->release_fn(input);
+    }
     
     *output = out;
     return IMGPROC_SUCCESS;

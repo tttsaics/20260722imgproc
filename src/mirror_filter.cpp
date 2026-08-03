@@ -1,11 +1,11 @@
 #include <imgproc_filter_common.h>
 #include <imgproc_logger.h>
 
-#include <cstdlib>  // 引入 C 標準庫，提供 malloc, free 等記憶體管理函式
+#include <cstdlib> 
 #include <cstring>  
-#include <limits>   //引入 numeric_limits，用於獲取資料型態的最大/最小值（用於防溢位檢查)
-#include <new>      // 引入 std::nothrow，用於記憶體分配失敗時回傳 nullptr 而非拋出例外
-#include <string>   // 引入 C++ std::string 類別，方便進行字串比較與處理
+#include <limits>  
+#include <new>      
+#include <string>   
 
 #ifdef __cplusplus
 extern "C" {

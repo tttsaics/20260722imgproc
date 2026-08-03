@@ -140,22 +140,22 @@ ImgProcStatus imgproc_config_get_boolean(ImgProcConfigHandle config_handle, cons
 
 ImgProcStatus imgproc_config_get_string(ImgProcConfigHandle config_handle, const char* section,
                                         const char* key, const char** value) {
-    if (config_handle == IMGPROC_INVALID_CONFIG_HANDLE) {//檢查參數
+    if (config_handle == IMGPROC_INVALID_CONFIG_HANDLE) {
         IMGPROC_LOG_ERROR("Invalid config handle.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    if (!section) {//檢查參數
+    if (!section) {
         IMGPROC_LOG_ERROR("'%s' is null.", IMGPROC_STR(section));
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    if (!key) {//檢查參數
+    if (!key) {
         IMGPROC_LOG_ERROR("'%s' is null.", IMGPROC_STR(key));
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    if (!value) {//檢查參數
+    if (!value) {
         IMGPROC_LOG_ERROR("'%s' is null.", IMGPROC_STR(value));
         return IMGPROC_ERROR_INVALID_ARG;
     }

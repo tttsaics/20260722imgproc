@@ -63,31 +63,31 @@ int main(void) {
     // 4. 測試紅通道 (Red Channel) 拆分處理
     ImgProcImage* img_r = NULL;
     if (imgproc_image_read(input_img_path, &img_r) == IMGPROC_SUCCESS) {
-        imgproc_image_keep_channel(img_r, IMGPROC_CHANNEL_R); // 僅保留 R 通道
+        imgproc_image_keep_channel(img_r, IMGPROC_CHANNEL_R);
         char out_path[512];// 組合輸出檔案路徑
-        snprintf(out_path, sizeof(out_path), "%s/test_channel_R.png", out_dir);// 寫出測試結果至 PNG
-        imgproc_image_write_png(out_path, img_r);             // 寫出測試結果至 PNG
-        imgproc_image_destroy(img_r);                        // 釋放影像記憶體
+        snprintf(out_path, sizeof(out_path), "%s/test_channel_R.png", out_dir);
+        imgproc_image_write_png(out_path, img_r);             
+        imgproc_image_destroy(img_r);                        
     }
 
     // 5. 測試綠通道 (Green Channel) 拆分處理
     ImgProcImage* img_g = NULL;
     if (imgproc_image_read(input_img_path, &img_g) == IMGPROC_SUCCESS) {
-        imgproc_image_keep_channel(img_g, IMGPROC_CHANNEL_G); // 僅保留 G 通道
+        imgproc_image_keep_channel(img_g, IMGPROC_CHANNEL_G); 
         char out_path[512];
         snprintf(out_path, sizeof(out_path), "%s/test_channel_G.png", out_dir);
-        imgproc_image_write_png(out_path, img_g);             // 寫出測試結果至 PNG
-        imgproc_image_destroy(img_g);                        // 釋放影像記憶體
+        imgproc_image_write_png(out_path, img_g);             
+        imgproc_image_destroy(img_g);                       
     }
 
     // 6. 測試藍通道 (Blue Channel) 拆分處理
     ImgProcImage* img_b = NULL;
     if (imgproc_image_read(input_img_path, &img_b) == IMGPROC_SUCCESS) {
-        imgproc_image_keep_channel(img_b, IMGPROC_CHANNEL_B); // 僅保留 B 通道
+        imgproc_image_keep_channel(img_b, IMGPROC_CHANNEL_B);
         char out_path[512];
         snprintf(out_path, sizeof(out_path), "%s/test_channel_B.png", out_dir);
-        imgproc_image_write_png(out_path, img_b);             // 寫出測試結果至 PNG
-        imgproc_image_destroy(img_b);                        // 釋放影像記憶體
+        imgproc_image_write_png(out_path, img_b);            
+        imgproc_image_destroy(img_b);                        
     }
 
     printf("Channel splitting test completed.\n");
