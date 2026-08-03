@@ -1,2 +1,6 @@
 [mirror_filter]
+# 鏡像模式選項：
+# "horizontal" - 水平鏡像 (左右翻轉，預設)
+# "vertical"   - 垂直鏡像 (上下翻轉)
+# "both"       - 雙向鏡像 (上下左右同時翻轉)
 mode = "both"

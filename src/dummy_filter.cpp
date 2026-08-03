@@ -37,6 +37,7 @@ ImgProcStatus dummy_filter_create(ImgProcFilterHandle* filter_handle,
     }
 
     int32_t value = 123;
+    //設定預設值為123，若有配置檔案則使用配置檔案的值
     if (filter_config_handle) {
         IMGPROC_LOG_INFO("Use configuration file.");
 
@@ -48,8 +49,8 @@ ImgProcStatus dummy_filter_create(ImgProcFilterHandle* filter_handle,
             return status;
         }
 
-        if (config_value <= std::numeric_limits<int32_t>::max()) {
-            value = static_cast<int32_t>(config_value);
+        if (config_value <= std::numeric_limits<int32_t>::max()) {//檢查配置檔案的值是否超過32位元整數的最大值
+            value = static_cast<int32_t>(config_value);//轉換成32位元整數
         } else {
             IMGPROC_LOG_WARN("'dummy_filter.value' overflow, use default value.");
         }
@@ -65,13 +66,14 @@ ImgProcStatus dummy_filter_create(ImgProcFilterHandle* filter_handle,
 
     filter->value = value;
 
-    *filter_handle = DUMMY_FILTER_TO_HANDLE(filter);
+    *filter_handle = DUMMY_FILTER_TO_HANDLE(filter);//將 filter 指標透過 DUMMY_FILTER_TO_HANDLE 巨集轉型為ImgProcFilterHandle（void*），並解引用賦值給 *filter_handle 傳回給呼叫者。
     IMGPROC_LOG_INFO("DummyFilter created.");
 
     return IMGPROC_SUCCESS;
 }
-ImgProcStatus dummy_filter_destroy(ImgProcFilterHandle filter_handle) {
-    DummyFilter* filter = DUMMY_FILTER_FROM_HANDLE(filter_handle);
+//防止記憶體洩漏，釋放 DummyFilter 物件的記憶體
+ImgProcStatus dummy_filter_destroy(ImgProcFilterHandle filter_handle) {//檢查 filter_handle 是否為空指標，若是則回傳錯誤狀態碼 IMGPROC_ERROR_INVALID_ARG。
+    DummyFilter* filter = DUMMY_FILTER_FROM_HANDLE(filter_handle);//將 filter_handle 透過 DUMMY_FILTER_FROM_HANDLE 巨集轉型為 DummyFilter*，並賦值給 filter。
     if (filter) {
         delete filter;
         IMGPROC_LOG_INFO("DummyFilter destroied.");
@@ -79,8 +81,9 @@ ImgProcStatus dummy_filter_destroy(ImgProcFilterHandle filter_handle) {
 
     return IMGPROC_SUCCESS;
 }
+//圖像轉換，將輸入圖像 input 直接賦值給輸出圖像 output，並記錄轉換過程中的資訊。
 ImgProcStatus dummy_filter_transform(ImgProcFilterHandle filter_handle, ImgProcImage* input,
-                                     ImgProcImage** output) {
+                                     ImgProcImage** output) {//檢查 filter_handle 是否為空指標，若是則回傳錯誤狀態碼 IMGPROC_ERROR_INVALID_ARG。
     if (!filter_handle) {
         IMGPROC_LOG_ERROR("'filter_handle' is null.");
         return IMGPROC_ERROR_INVALID_ARG;

@@ -16,7 +16,7 @@ struct ResizeFilter {
     double scale = 1.0;
     int32_t width = 0;
     int32_t height = 0;
-    std::string method = "bilinear";
+    std::string method = "bilinear";//雙線性插值法:透過周圍四個鄰近的像素點來算出新位置的顏色或數值
 };
 
 ImgProcStatus resize_filter_create(ImgProcFilterHandle* filter_handle, ImgProcConfigHandle filter_config_handle);
@@ -32,11 +32,12 @@ IMGPROC_FILTER_DECLARE_DESTROY_FN(resize_filter_destroy)
 IMGPROC_FILTER_DECLARE_TRANSFORM_FN(resize_filter_transform)
 
 ImgProcStatus resize_filter_create(ImgProcFilterHandle* filter_handle, ImgProcConfigHandle filter_config_handle) {
-    if (!filter_handle) {
+    if (!filter_handle) {   //確認 filter_handle 是否為空指針
         IMGPROC_LOG_ERROR("'filter_handle' is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
     *filter_handle = IMGPROC_INVALID_FILTER_HANDLE;
+    //int64_t 避免有溢位風險
     double scale = 1.0;
     int64_t width = 0;
     int64_t height = 0;
@@ -48,7 +49,7 @@ ImgProcStatus resize_filter_create(ImgProcFilterHandle* filter_handle, ImgProcCo
         double temp_scale = 0.0;
         ImgProcStatus status = imgproc_config_get_double(filter_config_handle, "resize_filter", "scale", &temp_scale);
         if (status == IMGPROC_SUCCESS) {
-            if (std::isfinite(temp_scale) && temp_scale > 0.0 && temp_scale <= 100.0) {
+            if (std::isfinite(temp_scale) && temp_scale > 0.0 && temp_scale <= 100.0) { //檢查 temp_scale 是否為有限且大於 0 的數值，並且不超過 100
                 scale = temp_scale;
             } else {
                 IMGPROC_LOG_WARN("Configured scale (%f) is invalid or non-finite. Using default (1.0).", temp_scale);
@@ -80,6 +81,7 @@ ImgProcStatus resize_filter_create(ImgProcFilterHandle* filter_handle, ImgProcCo
 
     filter->scale = scale;
     filter->width = (width >= INT32_MIN && width <= INT32_MAX) ? static_cast<int32_t>(width) : 0;
+    //將int64_t類型的width轉換為int32_t類型，並檢查是否在int32_t的範圍內，如果超出範圍則設置為0
     filter->height = (height >= INT32_MIN && height <= INT32_MAX) ? static_cast<int32_t>(height) : 0;
     if (method_str && (std::strcmp(method_str, "nearest") == 0 ||
                        std::strcmp(method_str, "bilinear") == 0)) {
@@ -104,7 +106,7 @@ ImgProcStatus resize_filter_destroy(ImgProcFilterHandle filter_handle) {
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    ResizeFilter* filter = static_cast<ResizeFilter*>(filter_handle);
+    ResizeFilter* filter = static_cast<ResizeFilter*>(filter_handle);   //將 filter_handle 轉換為 ResizeFilter* 類型的指針
     if (filter) {
         delete filter;
         IMGPROC_LOG_INFO("ResizeFilter destroyed.");
@@ -151,18 +153,20 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
+    //將新尺寸預設原長和寬
     uint32_t new_width = input_width;
     uint32_t new_height = input_height;
 
-    if (filter->width > 0 && filter->height > 0) {
+    if (filter->width > 0 && filter->height > 0) {  //如果設定了寬和高，則使用設定的值
         new_width = static_cast<uint32_t>(filter->width);
         new_height = static_cast<uint32_t>(filter->height);
-    } else if (std::isfinite(filter->scale) && filter->scale > 0.0) {
+    } else if (std::isfinite(filter->scale) && filter->scale > 0.0) {   //如果設定了縮放比例，則使用縮放比例計算新尺寸
+        //使用 std::round 進行四捨五入至最接近的整數像素，避免直接轉整數(無條件捨去)導致 1 像素的失真
         double calc_w = std::round(static_cast<double>(input_width) * filter->scale);
         double calc_h = std::round(static_cast<double>(input_height) * filter->scale);
         if (std::isfinite(calc_w) && std::isfinite(calc_h) && 
             calc_w >= 1.0 && calc_w <= 100000.0 && 
-            calc_h >= 1.0 && calc_h <= 100000.0) {
+            calc_h >= 1.0 && calc_h <= 100000.0) {  //設定最大和最小像素，防止極端異常
             new_width = static_cast<uint32_t>(calc_w);
             new_height = static_cast<uint32_t>(calc_h);
         } else {
@@ -174,14 +178,17 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         return IMGPROC_ERROR_INVALID_ARG;
     }
     
+    //至少有1x1像素，避免出現 0 尺寸的圖像
     if (new_width == 0) new_width = 1;
     if (new_height == 0) new_height = 1;
 
     constexpr uint32_t channels = 4;
     const uint64_t row_bytes = static_cast<uint64_t>(new_width) * channels;
     const uint64_t new_stride_64 = (row_bytes + 3u) & ~uint64_t(3u);
+    //~3(取反) 最後兩個位元強制為 00。任何整數與 ~3 進行 &（AND）位元運算後，最低兩位都會被清零，結果保證能被 4 整除
 
     const uint64_t total_bytes = new_stride_64 * new_height;
+    //強制轉為64位元避免發生溢位
     if (new_width > 100000 || new_height > 100000 ||
         new_stride_64 > std::numeric_limits<uint32_t>::max() ||
         total_bytes > 2000000000ULL ||
@@ -218,9 +225,9 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     out_img->width = new_width;
     out_img->height = new_height;
     out_img->stride = new_stride;
-    out_img->channels = channels;
+    out_img->channels = channels;//設定通道數為 4，對應 RGBA 圖像
     out_img->data_size = new_data_size;
-    out_img->release_fn = [](ImgProcImage* img) {
+    out_img->release_fn = [](ImgProcImage* img) {   //釋放圖像資源的函式
         if (img) {  
             if (img->data) {
                 free(img->data);
@@ -238,6 +245,7 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     uint8_t* dst = static_cast<uint8_t*>(out_img->data);
 
     if (filter->method == "nearest") {
+        //最鄰近插值法:掃描縮放後的「新影像」每一個像素點，算出它對應回「原圖」的相對位置，並直接把距離最近的像素顏色拿過來用
         for (uint32_t y = 0; y < new_height; ++y) {
             uint32_t src_y = static_cast<uint32_t>((static_cast<uint64_t>(y) * input_height) / new_height);
             if (src_y >= input_height) src_y = input_height - 1;
@@ -253,6 +261,7 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
             }
         }
     } else {
+        // Bilinear (雙線性插值法)線性插值則會抓取點周圍的 4 個相鄰像素，根據距離計算出權重後進行加權平均
         double scale_x = static_cast<double>(input_width) / new_width;
         double scale_y = static_cast<double>(input_height) / new_height;
 
