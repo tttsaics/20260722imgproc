@@ -8,9 +8,9 @@
 
 #define TEST_GET_VALUE_SECTION "test_get_value"
 
-#define TEST_PRINT_CALL_ERROR(expr, status) fprintf(stderr, "%s error: %s\n", #expr, imgproc_get_status_str((status)))//用於格式化輸出函式調用錯誤訊息，將函式名稱和狀態碼轉換為可讀的字串
+#define TEST_PRINT_CALL_ERROR(expr, status) fprintf(stderr, "%s error: %s\n", #expr, imgproc_get_status_str((status)))
 
-static bool test_get_int(ImgProcConfigHandle config_handle) {//測試讀取整數
+static bool test_get_int(ImgProcConfigHandle config_handle) {
     ImgProcStatus status = IMGPROC_SUCCESS;
     const int64_t expected = 123;
     int64_t value = 0;
@@ -29,7 +29,7 @@ static bool test_get_int(ImgProcConfigHandle config_handle) {//測試讀取整�
     return true;
 }
 
-static bool test_get_double(ImgProcConfigHandle config_handle) {//測試讀取浮點數
+static bool test_get_double(ImgProcConfigHandle config_handle) {
     ImgProcStatus status = IMGPROC_SUCCESS;
     const double expected = 12.3;
     double value = 0;
@@ -48,7 +48,7 @@ static bool test_get_double(ImgProcConfigHandle config_handle) {//測試讀取�
     return true;
 }
 
-static bool test_get_boolean(ImgProcConfigHandle config_handle) {//測試讀取布林值
+static bool test_get_boolean(ImgProcConfigHandle config_handle) {
     ImgProcStatus status = IMGPROC_SUCCESS;
     bool value = true;
 
@@ -77,7 +77,7 @@ static bool test_get_boolean(ImgProcConfigHandle config_handle) {//測試讀取�
     return true;
 }
 
-static bool test_get_string(ImgProcConfigHandle config_handle) {//測試讀取字串
+static bool test_get_string(ImgProcConfigHandle config_handle) {
     ImgProcStatus status = IMGPROC_SUCCESS;
     const char* expected = "hello world";
     const char* value = "";
@@ -98,7 +98,7 @@ static bool test_get_string(ImgProcConfigHandle config_handle) {//測試讀取�
 
 int main() {
     imgproc_logger_use_console();
-    imgproc_logger_set_level(IMGPROC_LOGLEVEL_INFO);//設置日誌級別為INFO
+    imgproc_logger_set_level(IMGPROC_LOGLEVEL_INFO);
 
     ImgProcStatus status = IMGPROC_SUCCESS;
     ImgProcConfigHandle config_handle = IMGPROC_INVALID_CONFIG_HANDLE;

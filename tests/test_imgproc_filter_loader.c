@@ -6,14 +6,14 @@
 
 #define TEST_PRINT_CALL_ERROR(expr, status) fprintf(stderr, "%s error: %s\n", #expr, imgproc_get_status_str((status)))
 
-static void release_image(ImgProcImage* img) {//這個函式用於釋放圖像資源，檢查圖像的data指針是否為NULL，如果不是，則釋放其所指向的內存，並將data指針設置為NULL。
+static void release_image(ImgProcImage* img) {
     if (img->data) {
         free(img->data);
         img->data = NULL;
     }
 }
 
-static bool init_image(ImgProcImage* img) {//這個函式用於初始化圖像結構體，設置其寬度、高度、步幅和數據大小，並分配內存給data指針。如果內存分配失敗，返回false，否則設置釋放函式指針並返回true。
+static bool init_image(ImgProcImage* img) {
     img->width = 1280;
     img->height = 720;
     img->stride = 4096;
@@ -29,7 +29,7 @@ static bool init_image(ImgProcImage* img) {//這個函式用於初始化圖像�
     return true;
 }
 
-static bool test_transform(const ImgProcFilterApi* api, ImgProcFilterHandle filter_handle) {//這個函式用於測試濾鏡的圖像轉換功能，首先初始化一個輸入圖像，然後調用濾鏡的transform函式進行圖像轉換，最後檢查輸入圖像和輸出圖像是否為同一個實例。如果轉換成功且兩個圖像是同一個實例，返回true，否則返回false。
+static bool test_transform(const ImgProcFilterApi* api, ImgProcFilterHandle filter_handle) {
     ImgProcStatus status = IMGPROC_SUCCESS;
     ImgProcImage input_image;
     ImgProcImage* output_image = NULL;
@@ -59,7 +59,7 @@ static bool test_transform(const ImgProcFilterApi* api, ImgProcFilterHandle filt
 
 int main() {
     imgproc_logger_use_console();
-    imgproc_logger_set_level(IMGPROC_LOGLEVEL_DEBUG);//第四層及
+    imgproc_logger_set_level(IMGPROC_LOGLEVEL_DEBUG);
 
     ImgProcStatus status = IMGPROC_SUCCESS;
     ImgProcConfigHandle config_handle = IMGPROC_INVALID_CONFIG_HANDLE;

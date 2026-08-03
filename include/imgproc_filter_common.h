@@ -8,10 +8,10 @@ extern "C" {
 #endif
 
 /** @brief A handle to the plugin defined data. */
-typedef void* ImgProcFilterHandle; //將void*定義為ImgProcFilterHandle，表示這個handle可以指向任何類型的資料，通常用於封裝插件的內部資料結構。
+typedef void* ImgProcFilterHandle;
 
 /** @brief The value represents an invalid handle. */
-#define IMGPROC_INVALID_FILTER_HANDLE (NULL) //將NULL定義為IMGPROC_INVALID_FILTER_HANDLE，表示這個handle是無效的，通常用於檢查插件是否正確初始化或釋放。   
+#define IMGPROC_INVALID_FILTER_HANDLE (NULL)
 
 /**
  * @brief The signature of a filter create function defined by the plugin.
@@ -29,7 +29,7 @@ typedef void* ImgProcFilterHandle; //將void*定義為ImgProcFilterHandle，表�
  * @retval @ref IMGPROC_ERROR_FILTER_SPECIFIC All other errors in the plugin.
  * */
 typedef ImgProcStatus (*ImgProcFilterCreateFn)(ImgProcFilterHandle* filter_handle,
-                                               ImgProcConfigHandle filter_config_handle);//將ImgProcFilterCreateFn定義為函式指標，表示這個函式指標可以指向任何符合該簽名的函式，通常用於封裝插件的創建邏輯。
+                                               ImgProcConfigHandle filter_config_handle);
 
 /**
  * @brief The signature of a filter destroy function defined by the plugin.
@@ -42,7 +42,7 @@ typedef ImgProcStatus (*ImgProcFilterCreateFn)(ImgProcFilterHandle* filter_handl
  * @retval @ref IMGPROC_ERROR_INVALID_ARG @a filter_handle is @ref IMGPROC_INVALID_FILTER_HANDLE.
  * @retval @ref IMGPROC_ERROR_FILTER_SPECIFIC All other errors in the plugin.
  * */
-typedef ImgProcStatus (*ImgProcFilterDestroyFn)(ImgProcFilterHandle filter_handle);//將ImgProcFilterDestroyFn定義為函式指標，表示這個函式指標可以指向任何符合該簽名的函式，通常用於封裝插件的銷毀邏輯。
+typedef ImgProcStatus (*ImgProcFilterDestroyFn)(ImgProcFilterHandle filter_handle);
 
 /**
  * @brief The signature of a filter transform function defined by the plugin.
@@ -62,7 +62,7 @@ typedef ImgProcStatus (*ImgProcFilterDestroyFn)(ImgProcFilterHandle filter_handl
  * @retval @ref IMGPROC_ERROR_FILTER_SPECIFIC All other errors in the plugin.
  * */
 typedef ImgProcStatus (*ImgProcFilterTransformFn)(ImgProcFilterHandle filter_handle,
-                                                  ImgProcImage* input, ImgProcImage** output);//宣告ImgProcFilterTransformFn為函式指標，表示這個函式指標可以指向任何符合該簽名的函式，通常用於封裝插件的圖像轉換邏輯。
+                                                  ImgProcImage* input, ImgProcImage** output);
 
 #ifdef __cplusplus
 }
