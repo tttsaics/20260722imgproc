@@ -27,9 +27,9 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
 }
 #endif
 
-IMGPROC_FILTER_DECLARE_CREATE_FN(rotate_filter_create)  //註冊濾鏡創建入口涵式
-IMGPROC_FILTER_DECLARE_DESTROY_FN(rotate_filter_destroy)//註冊濾鏡銷毀入口涵式
-IMGPROC_FILTER_DECLARE_TRANSFORM_FN(rotate_filter_transform)//註冊濾鏡轉換入口涵式
+IMGPROC_FILTER_DECLARE_CREATE_FN(rotate_filter_create)  
+IMGPROC_FILTER_DECLARE_DESTROY_FN(rotate_filter_destroy)
+IMGPROC_FILTER_DECLARE_TRANSFORM_FN(rotate_filter_transform)
 
 ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
                                    ImgProcConfigHandle filter_config_handle) {
@@ -47,7 +47,7 @@ ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
         ImgProcStatus status =
             imgproc_config_get_int64(filter_config_handle, "rotate_filter", "angle", &config_angle);
         if (status == IMGPROC_SUCCESS) {
-            if (config_angle >= INT32_MIN && config_angle <= INT32_MAX) {   //保證數值轉換安全
+            if (config_angle >= INT32_MIN && config_angle <= INT32_MAX) {   //確保數值轉換安全
                 angle = static_cast<int32_t>(config_angle);
             } else {
                 IMGPROC_LOG_WARN("Config angle %ld out of int32 bounds, using default (%d).", config_angle, angle);
@@ -60,15 +60,15 @@ ImgProcStatus rotate_filter_create(ImgProcFilterHandle* filter_handle,
     }
 
     //角度正規劃
-    int normalized_angle = angle % 360; //同餘轉換
-    if (normalized_angle < 0) normalized_angle += 360;//負數補正
+    int normalized_angle = angle % 360;  //同餘轉換
+    if (normalized_angle < 0) normalized_angle += 360;  //負數補正
 
     if (normalized_angle != 0 && normalized_angle != 90 && normalized_angle != 180 && normalized_angle != 270) {
         IMGPROC_LOG_ERROR("Invalid rotation angle: %d. Only 90, 180, 270, and 360 degrees are supported.", angle);
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    RotateFilter* filter = new (std::nothrow) RotateFilter; // 動態分配 RotateFilter 記憶體，不拋出例外
+    RotateFilter* filter = new (std::nothrow) RotateFilter; 
     if (!filter) {
         IMGPROC_LOG_ERROR("Unable to allocate memory for 'RotateFilter'.");
         return IMGPROC_ERROR_OUT_OF_MEMOERY;
@@ -143,7 +143,7 @@ ImgProcStatus rotate_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     uint32_t new_width = input_width;
     uint32_t new_height = input_height;
 
-    if (angle == 90 || angle == 270) {//若角度是 90 or 270長寬要對調
+    if (angle == 90 || angle == 270) {  //若角度是 90 or 270長寬要對調
         new_width = input_height;
         new_height = input_width;
     }

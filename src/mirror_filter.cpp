@@ -35,11 +35,11 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
 #endif
 
 // 宣告匯出框架所需的 C 介面函式綁定巨集
-IMGPROC_FILTER_DECLARE_CREATE_FN(mirror_filter_create)  //註冊濾鏡創建入口函式
-IMGPROC_FILTER_DECLARE_DESTROY_FN(mirror_filter_destroy)//註冊濾鏡銷毀入口函式
-IMGPROC_FILTER_DECLARE_TRANSFORM_FN(mirror_filter_transform)//註冊濾鏡轉換入口函式
+IMGPROC_FILTER_DECLARE_CREATE_FN(mirror_filter_create)  
+IMGPROC_FILTER_DECLARE_DESTROY_FN(mirror_filter_destroy)
+IMGPROC_FILTER_DECLARE_TRANSFORM_FN(mirror_filter_transform)
 
-//建立鏡像濾鏡實例
+
 ImgProcStatus mirror_filter_create(ImgProcFilterHandle* filter_handle,
                                    ImgProcConfigHandle filter_config_handle) {
     if (!filter_handle) {
@@ -48,7 +48,7 @@ ImgProcStatus mirror_filter_create(ImgProcFilterHandle* filter_handle,
     }
     *filter_handle = IMGPROC_INVALID_FILTER_HANDLE;
 
-    MirrorMode mode = MirrorMode::HORIZONTAL;   //預設值horizontal
+    MirrorMode mode = MirrorMode::HORIZONTAL;   
     const char* mode_str = nullptr;
 
     if (filter_config_handle) {
@@ -74,7 +74,7 @@ ImgProcStatus mirror_filter_create(ImgProcFilterHandle* filter_handle,
         IMGPROC_LOG_INFO("Configuration file is not specified, using default mirror mode ('horizontal').");
     }
 
-    MirrorFilter* filter = new (std::nothrow) MirrorFilter; //不拋出例外只會回傳nullptr
+    MirrorFilter* filter = new (std::nothrow) MirrorFilter;  //不拋出例外只會回傳nullptr
     if (!filter) {  
         IMGPROC_LOG_ERROR("Unable to allocate memory for 'MirrorFilter'.");
         return IMGPROC_ERROR_OUT_OF_MEMOERY;
@@ -87,7 +87,6 @@ ImgProcStatus mirror_filter_create(ImgProcFilterHandle* filter_handle,
     return IMGPROC_SUCCESS;
 }
 
-//銷毀鏡像濾鏡實例
 ImgProcStatus mirror_filter_destroy(ImgProcFilterHandle filter_handle) {
     if (!filter_handle) {
         IMGPROC_LOG_ERROR("'filter_handle' is null.");
@@ -96,6 +95,7 @@ ImgProcStatus mirror_filter_destroy(ImgProcFilterHandle filter_handle) {
 
     MirrorFilter* filter = MIRROR_FILTER_FROM_HANDLE(filter_handle); 
     //利用巨集將對外公開的抽象控制碼 filter_handle（通常是 void*），轉回內部的 C++ MirrorFilter* 指標
+
     if (filter) {
         delete filter;
         IMGPROC_LOG_INFO("MirrorFilter destroyed.");
@@ -103,7 +103,7 @@ ImgProcStatus mirror_filter_destroy(ImgProcFilterHandle filter_handle) {
     return IMGPROC_SUCCESS;
 }
 
-//執行鏡像圖像轉換處理
+
 ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProcImage* input,
                                       ImgProcImage** output) {
     if (!filter_handle) {
@@ -158,7 +158,7 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         return IMGPROC_ERROR_OUT_OF_MEMOERY;
     }
 
-    out_img->data = std::malloc(data_size); //配置放置輸出像素資料的記憶體 Buffer
+    out_img->data = std::malloc(data_size); 
     if (!out_img->data) {
         delete out_img;
         IMGPROC_LOG_ERROR("Failed to allocate image buffer.");
@@ -173,10 +173,10 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     out_img->stride = stride;
     out_img->channels = channels;
     out_img->data_size = data_size;
-    out_img->release_fn = [](ImgProcImage* img) {      //定義輸出圖像釋放時的自訂函式
+    out_img->release_fn = [](ImgProcImage* img) {      
         if (img) {
             if (img->data) {
-                std::free(img->data);    // 釋放像素資料記憶體
+                std::free(img->data);   
                 img->data = nullptr;
             }
         }
@@ -191,12 +191,12 @@ ImgProcStatus mirror_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     bool flip_h = (filter->mode == MirrorMode::HORIZONTAL || filter->mode == MirrorMode::BOTH);
     bool flip_v = (filter->mode == MirrorMode::VERTICAL || filter->mode == MirrorMode::BOTH);
 
-    for (uint32_t y = 0; y < height; ++y) {     // Y 軸外層迴圈：逐列處理
+    for (uint32_t y = 0; y < height; ++y) {     
         uint32_t src_y = flip_v ? (height - 1 - y) : y;     //若要垂直翻轉，將 Y 座標倒置，否則保持原 Y 座標
         const uint8_t* src_row = src + static_cast<size_t>(src_y) * stride; // 計算來源圖像當前行的記憶體起始位址
         uint8_t* dst_row = dst + static_cast<size_t>(y) * stride;           // 計算目標圖像當前行的記憶體起始位址
 
-        for (uint32_t x = 0; x < width; ++x) {  // X 軸中層迴圈：逐像素處理
+        for (uint32_t x = 0; x < width; ++x) {  
             uint32_t src_x = flip_h ? (width - 1 - x) : x;  //若要水平翻轉，將 X 座標倒置，否則保持原 X 座標
 
             const uint8_t* src_pixel = src_row + static_cast<size_t>(src_x) * channels; // 計算來源像素的記憶體位址

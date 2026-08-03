@@ -16,7 +16,7 @@ struct ResizeFilter {
     double scale = 1.0;
     int32_t width = 0;
     int32_t height = 0;
-    std::string method = "bilinear";//雙線性插值法:透過周圍四個鄰近的像素點來算出新位置的顏色或數值
+    std::string method = "bilinear";
 };
 
 ImgProcStatus resize_filter_create(ImgProcFilterHandle* filter_handle, ImgProcConfigHandle filter_config_handle);
@@ -32,7 +32,7 @@ IMGPROC_FILTER_DECLARE_DESTROY_FN(resize_filter_destroy)
 IMGPROC_FILTER_DECLARE_TRANSFORM_FN(resize_filter_transform)
 
 ImgProcStatus resize_filter_create(ImgProcFilterHandle* filter_handle, ImgProcConfigHandle filter_config_handle) {
-    if (!filter_handle) {   //確認 filter_handle 是否為空指針
+    if (!filter_handle) {  
         IMGPROC_LOG_ERROR("'filter_handle' is null.");
         return IMGPROC_ERROR_INVALID_ARG;
     }
@@ -106,7 +106,7 @@ ImgProcStatus resize_filter_destroy(ImgProcFilterHandle filter_handle) {
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    ResizeFilter* filter = static_cast<ResizeFilter*>(filter_handle);   //將 filter_handle 轉換為 ResizeFilter* 類型的指針
+    ResizeFilter* filter = static_cast<ResizeFilter*>(filter_handle);   
     if (filter) {
         delete filter;
         IMGPROC_LOG_INFO("ResizeFilter destroyed.");
@@ -160,7 +160,7 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     if (filter->width > 0 && filter->height > 0) {  //如果設定了寬和高，則使用設定的值
         new_width = static_cast<uint32_t>(filter->width);
         new_height = static_cast<uint32_t>(filter->height);
-    } else if (std::isfinite(filter->scale) && filter->scale > 0.0) {   //如果設定了縮放比例，則使用縮放比例計算新尺寸
+    } else if (std::isfinite(filter->scale) && filter->scale > 0.0) {  
         //使用 std::round 進行四捨五入至最接近的整數像素，避免直接轉整數(無條件捨去)導致 1 像素的失真
         double calc_w = std::round(static_cast<double>(input_width) * filter->scale);
         double calc_h = std::round(static_cast<double>(input_height) * filter->scale);
@@ -227,7 +227,7 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     out_img->stride = new_stride;
     out_img->channels = channels;//設定通道數為 4，對應 RGBA 圖像
     out_img->data_size = new_data_size;
-    out_img->release_fn = [](ImgProcImage* img) {   //釋放圖像資源的函式
+    out_img->release_fn = [](ImgProcImage* img) { 
         if (img) {  
             if (img->data) {
                 free(img->data);
@@ -247,13 +247,18 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
     if (filter->method == "nearest") {
         //最鄰近插值法:掃描縮放後的「新影像」每一個像素點，算出它對應回「原圖」的相對位置，並直接把距離最近的像素顏色拿過來用
         for (uint32_t y = 0; y < new_height; ++y) {
-            uint32_t src_y = static_cast<uint32_t>((static_cast<uint64_t>(y) * input_height) / new_height);
-            if (src_y >= input_height) src_y = input_height - 1;
+            uint32_t src_y = static_cast<uint32_t>((static_cast<uint64_t>(y) * input_height) / new_height); //計算對應回原圖的 Y 座標
+
+            if (src_y >= input_height) src_y = input_height - 1;    //避免超出原圖範圍
+            //計算來源和目標行的記憶體位置起始位置
             const uint8_t* src_row = src + static_cast<size_t>(src_y) * input_stride;
             uint8_t* dst_row = dst + static_cast<size_t>(y) * new_stride;
-            for (uint32_t x = 0; x < new_width; ++x) {
+
+            for (uint32_t x = 0; x < new_width; ++x) {  //計算對應回原圖的 X 座標
                 uint32_t src_x = static_cast<uint32_t>((static_cast<uint64_t>(x) * input_width) / new_width);
+
                 if (src_x >= input_width) src_x = input_width - 1;
+
                 for (uint32_t c = 0; c < channels; ++c) {
                     dst_row[static_cast<size_t>(x) * channels + c] =
                         src_row[static_cast<size_t>(src_x) * channels + c];
@@ -262,15 +267,18 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
         }
     } else {
         // Bilinear (雙線性插值法)線性插值則會抓取點周圍的 4 個相鄰像素，根據距離計算出權重後進行加權平均
+        //計算縮放比例
         double scale_x = static_cast<double>(input_width) / new_width;
         double scale_y = static_cast<double>(input_height) / new_height;
 
-        for (uint32_t y = 0; y < new_height; ++y) {
+        for (uint32_t y = 0; y < new_height; ++y) { 
+            //將新舊圖像的幾何中心重合
             double src_yf = (y + 0.5) * scale_y - 0.5;
-            int64_t y0 = static_cast<int64_t>(std::floor(src_yf));
-            int64_t y1 = y0 + 1;
+            int64_t y0 = static_cast<int64_t>(std::floor(src_yf)); //取左上/上方相鄰像素 Y 座標
+            int64_t y1 = y0 + 1;    //取右下/下方相鄰像素 Y 座標
             double dy = src_yf - y0;
-
+            
+            //邊界處理，避免超出原圖範圍
             if (y0 < 0) { y0 = 0; y1 = 0; }
             if (y1 >= static_cast<int64_t>(input_height)) { y0 = input_height - 1; y1 = input_height - 1; }
 
@@ -278,28 +286,29 @@ ImgProcStatus resize_filter_transform(ImgProcFilterHandle filter_handle, ImgProc
 
             for (uint32_t x = 0; x < new_width; ++x) {
                 double src_xf = (x + 0.5) * scale_x - 0.5;
-                int64_t x0 = static_cast<int64_t>(std::floor(src_xf));
-                int64_t x1 = x0 + 1;
+                int64_t x0 = static_cast<int64_t>(std::floor(src_xf));  //取左側像素 X 座標
+                int64_t x1 = x0 + 1;       //取右側像素 X 座標
                 double dx = src_xf - x0;
-
+                
+                //邊界處理，避免超出原圖範圍
                 if (x0 < 0) { x0 = 0; x1 = 0; }
                 if (x1 >= static_cast<int64_t>(input_width)) { x0 = input_width - 1; x1 = input_width - 1; }
 
                 for (uint32_t c = 0; c < channels; ++c) {
                     double val00 = src[static_cast<size_t>(y0) * input_stride +
-                                       static_cast<size_t>(x0) * channels + c];
+                                       static_cast<size_t>(x0) * channels + c];//val00 :左上(x0, y0)
                     double val10 = src[static_cast<size_t>(y0) * input_stride +
-                                       static_cast<size_t>(x1) * channels + c];
+                                       static_cast<size_t>(x1) * channels + c];//val10 :右上(x1, y0)
                     double val01 = src[static_cast<size_t>(y1) * input_stride +
-                                       static_cast<size_t>(x0) * channels + c];
+                                       static_cast<size_t>(x0) * channels + c];//val01 :左下(x0, y1)
                     double val11 = src[static_cast<size_t>(y1) * input_stride +
-                                       static_cast<size_t>(x1) * channels + c];
-
+                                       static_cast<size_t>(x1) * channels + c];//val11 :右下(x1, y1)
+                    //雙線性差值公式
                     double val = val00 * (1.0 - dx) * (1.0 - dy) +
                                  val10 * dx * (1.0 - dy) +
                                  val01 * (1.0 - dx) * dy +
                                  val11 * dx * dy;
-
+                    //使用 std::clamp 確保結果在 0~255 範圍內，避免溢位
                     dst_row[static_cast<size_t>(x) * channels + c] =
                         static_cast<uint8_t>(std::clamp(val, 0.0, 255.0));
                 }
