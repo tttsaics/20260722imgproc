@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <limits>
 #include <new>
+#include <string_view>
 
 #include "imgproc_logger.h"
 #include "priv/imgproc_helper.h"
@@ -55,6 +56,20 @@ ImgProcStatus imgproc_image_read(const char* filename, ImgProcImage** image) {
     if (!image) {
         IMGPROC_LOG_ERROR("'%s' is null.", IMGPROC_STR(image));
         return IMGPROC_ERROR_INVALID_ARG;
+    }
+
+    // 零拷貝檢測副檔名：若非標準 .jpg/.jpeg/.png，發出 Warning 警告，但仍嘗試呼叫 stbi_load 進行解碼！
+    std::string_view sv(filename);
+    size_t dot_pos = sv.rfind('.');
+    if (dot_pos != std::string_view::npos) {
+        std::string_view ext = sv.substr(dot_pos);
+        bool is_standard = (ext == ".jpg"  || ext == ".JPG"  ||
+                            ext == ".jpeg" || ext == ".JPEG" ||
+                            ext == ".png"  || ext == ".PNG");
+        if (!is_standard) {
+            IMGPROC_LOG_WARN("Unusual input image extension '%.*s'. Attempting to decode image content anyway.",
+                             static_cast<int>(ext.length()), ext.data());
+        }
     }
 
     int width = 0;
@@ -238,14 +253,14 @@ ImgProcStatus imgproc_image_destroy(ImgProcImage* image) {
         return IMGPROC_ERROR_INVALID_ARG;
     }
 
-    // 先用 producer 指定的 callback 釋放像素，再刪除影像結構。
-    if (image->release_fn) {
-        image->release_fn(image);
-    } else if (image->data) {
-        // 沒有 callback 時使用 stb 釋放函式作為相容性 fallback。
-        stbi_image_free(image->data);
-        image->data = nullptr;
+    // 嚴格 C-ABI 契約：Producer 必須提供對應的 release_fn 釋放回調函數。
+    if (!image->release_fn) {
+        IMGPROC_LOG_ERROR("Image release_fn is null. Producer must specify a valid release callback.");
+        return IMGPROC_ERROR_INVALID_ARG;
     }
+
+    // 呼叫專屬的釋放函數清理像素資料。
+    image->release_fn(image);
 
     delete image;
     return IMGPROC_SUCCESS;

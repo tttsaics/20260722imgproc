@@ -25,15 +25,6 @@ static void print_usage(const char* prog_name) {
               << "If no arguments are provided, automatically runs batch processing on inputs/ folder.\n";
 }
 
-static bool is_image_extension(const std::string& filename) {
-    // 透過 std::filesystem 解析副檔名並轉小寫比對。
-    std::filesystem::path p(filename);
-    std::string ext = p.extension().string();
-    // 轉成小寫字母，確保相機或外接檔案全大寫副檔名（如 .PNG / .JPG）能大小寫不敏感 (Case-Insensitive) 相容。
-    for (char& c : ext) c = static_cast<char>(std::tolower(c));
-    return (ext == ".jpg" || ext == ".jpeg" || ext == ".png");
-}
-
 static ImgProcStatus process_single_image(const std::string& input_path,
                                          const std::string& output_path,
                                          const std::vector<std::string>& filter_paths,
@@ -43,21 +34,29 @@ static ImgProcStatus process_single_image(const std::string& input_path,
 
     // 1. 入口參數邊界檢驗：若指定 -ch，檢查是否為合法通道 (R, G, B)。
     if (!channel_str.empty()) {
-        std::string ch_upper = channel_str;
-        for (char& c : ch_upper) c = static_cast<char>(std::toupper(c));
-        if (ch_upper != "R" && ch_upper != "G" && ch_upper != "B") {
+        if(channel_str.length() != 1) {
+            IMGPROC_LOG_ERROR("Invalid channel parameter '%s'. Must be a single character: R, G, or B.", channel_str.c_str());
+            return IMGPROC_ERROR_INVALID_ARG;
+        }
+        char ch_upper = static_cast<char>(std::toupper(channel_str[0]));
+        if (ch_upper != 'R' && ch_upper != 'G' && ch_upper != 'B') {
             IMGPROC_LOG_ERROR("Invalid channel parameter '%s'. Must be R, G, or B.", channel_str.c_str());
             return IMGPROC_ERROR_INVALID_ARG;
         }
     }
 
     // 2. 檢驗輸出副檔名是否為支援的格式 (.jpg, .jpeg, .png)。
-    std::filesystem::path out_p(output_path);
-    std::string out_ext = out_p.extension().string();
-    for (char& c : out_ext) c = static_cast<char>(std::tolower(c));
-    if (!out_ext.empty() && out_ext != ".jpg" && out_ext != ".jpeg" && out_ext != ".png") {
-        IMGPROC_LOG_ERROR("Unsupported output file extension '%s'. Only .png, .jpg, and .jpeg are supported.", out_ext.c_str());
-        return IMGPROC_ERROR_INVALID_ARG;
+    bool is_jpeg = false;
+    std::string_view sv(output_path);
+    size_t dot_pos = sv.rfind('.');
+    if (dot_pos != std::string_view::npos) {
+        std::string_view ext = sv.substr(dot_pos);
+        if (ext == ".jpg" || ext == ".JPG" || ext == ".jpeg" || ext == ".JPEG") {
+            is_jpeg = true;
+        } else if (ext != ".png" && ext != ".PNG") {
+            IMGPROC_LOG_WARN("Unsupported output file extension '%.*s'. Fallback to default PNG format.",
+                             static_cast<int>(ext.length()), ext.data());
+        }
     }
 
     // 3. 透過 Image IO 模組讀取輸入圖片。
@@ -71,11 +70,14 @@ static ImgProcStatus process_single_image(const std::string& input_path,
     // 追蹤所有已載入的外掛 API 與控制句柄，確保 `.so` 在圖片完全解構前維持有效。
     std::vector<ImgProcFilterApi> loaded_apis;
     std::vector<ImgProcFilterHandle> active_handles;
+    loaded_apis.reserve(filter_paths.size());
+    active_handles.reserve(filter_paths.size());
 
     // 4. 按順序鏈式執行多外掛流水線 (Filter Pipeline)。
     for (size_t i = 0; i < filter_paths.size(); ++i) {
         const std::string& f_path = filter_paths[i];
-        std::string c_path = (i < config_paths.size()) ? config_paths[i] : "";
+        static const std::string empty_str = "";
+        const std::string& c_path = (i < config_paths.size()) ? config_paths[i] : empty_str;
 
         // 若提供配對的 TOML 設定檔，載入設定檔控制句柄。
         ImgProcConfigHandle config_handle = IMGPROC_INVALID_CONFIG_HANDLE;
@@ -111,8 +113,8 @@ static ImgProcStatus process_single_image(const std::string& input_path,
         }
 
         // 將成功的 API 與 Handle 存入陣列，維護動態庫代碼段 (Code Segment) 生命週期。
-        loaded_apis.push_back(filter_api);
-        active_handles.push_back(filter_handle);
+        loaded_apis.emplace_back(filter_api);
+        active_handles.emplace_back(filter_handle);
 
         // 執行影像變換，將 current_img 作為輸入，取得產出的 next_img。
         ImgProcImage* next_img = nullptr;
@@ -143,7 +145,7 @@ static ImgProcStatus process_single_image(const std::string& input_path,
 
     // 6. 依據副檔名透過 Image IO 模組將最終影像寫回硬碟。
     if (status == IMGPROC_SUCCESS) {
-        if (out_ext == ".jpg" || out_ext == ".jpeg") {
+        if (is_jpeg) {
             status = imgproc_image_write_jpg(output_path.c_str(), current_img, 90);
         } else {
             status = imgproc_image_write_png(output_path.c_str(), current_img);
@@ -179,7 +181,7 @@ int main(int argc, char* argv[]) {
 
     // 解析 CLI 命令列參數。
     for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
+        std::string_view arg = argv[i];
         if (arg == "-h" || arg == "--help") {
             print_usage(argv[0]);
             return EXIT_SUCCESS;
@@ -208,11 +210,6 @@ int main(int argc, char* argv[]) {
     // 自動批次處理模式 (Auto Batch Mode)：若無 CLI 參數，自動掃描 inputs/ 資料夾。
     std::string in_dir = "inputs";
     std::string out_dir = "outputs";
-    // 工作目錄自適應：當在 build/ 子目錄執行時降級指向 ../inputs，雙重檢查防範空目錄無效重定向。
-    if (!std::filesystem::exists(in_dir) && std::filesystem::exists("../inputs")) {
-        in_dir = "../inputs";
-        out_dir = "../outputs";
-    }
 
     if (!std::filesystem::exists(in_dir)) {
         IMGPROC_LOG_ERROR("Input directory '%s' does not exist.", in_dir.c_str());
@@ -224,7 +221,7 @@ int main(int argc, char* argv[]) {
     bool processed_any = false;
     bool all_success = true;
     for (const auto& entry : std::filesystem::directory_iterator(in_dir)) {
-        if (entry.is_regular_file() && is_image_extension(entry.path().string())) {
+        if (entry.is_regular_file()) {
             std::string in_file = entry.path().string();
             std::string out_file = out_dir + "/" + entry.path().stem().string() + "_processed.png";
             IMGPROC_LOG_INFO("Processing batch file: %s -> %s", in_file.c_str(), out_file.c_str());
